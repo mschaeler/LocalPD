@@ -130,7 +130,7 @@ public class Graph {
 		int counter = 0;
 		for(Egde e : this.edges) {
 			if(counter > 10) break;
-			sb.append("\n"+e);
+			sb.append(" "+e);
 			counter++;
 			//ret+="\n"+e;
 		}
