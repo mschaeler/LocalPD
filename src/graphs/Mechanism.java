@@ -233,10 +233,14 @@ public class Mechanism {
 		@SuppressWarnings("unchecked")
 		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
 		
+		boolean[] duplicate_check = new boolean[g.num_vertices];
+		
 		for(int node=0;node<g.num_vertices;node++) {
+			Arrays.fill(duplicate_check, false);
+
 			//Execute Q1
 			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
-			final int edges_per_group = (int) Math.ceil((double)g.num_vertices / sanitized_number_of_outgoing_egdes);
+			final int edges_per_group = (int) Math.floor((double)g.num_vertices / sanitized_number_of_outgoing_egdes);
 			
 			//Partition and Shuffle the data
 			Random rand_node = new Random(node);
@@ -245,20 +249,23 @@ public class Mechanism {
 			
 			for(int group = 0;group<sanitized_number_of_outgoing_egdes;group++) {
 				int my_neighbor_in_group = get_group_edge_or_random(group, neighbor_list[node], sanitized_number_of_outgoing_egdes, edges_per_group, rand_node);
-				if(my_neighbor_in_group==481132) {
-					System.err.println("my_neighbor_in_group");
-				}
 				my_neighbors[group] = my_neighbor_in_group;
+				if(duplicate_check[my_neighbor_in_group]) {
+					System.err.println("duplicate_check[my_neighbor_in_group] at "+my_neighbor_in_group);
+				}
+				duplicate_check[my_neighbor_in_group] = true;
+				
 				while(true){
 					//get some random edge form this group
 					int i = rand_node.nextInt(edges_per_group);
 					int e=i*sanitized_number_of_outgoing_egdes;
 					e+=group;
-					if(e!=my_neighbor_in_group) {
+					if(!neighbor_list[node].contains(e) && my_neighbor_in_group!=e) {//can be multiple neighbors and can be invented fake edge
 						fake_edges[group] = e;
-						if(e==481132) {
-							System.err.println("my_neighbor_in_group");
+						if(duplicate_check[e]) {
+							System.err.println("duplicate_check[e] at "+e);
 						}
+						duplicate_check[e] = true;
 						break;
 					}
 				}
@@ -267,7 +274,7 @@ public class Mechanism {
 			for(int e : neighbor_list[node]) {
 				for(int f_e : fake_edges) {
 					if(e == f_e) {
-						System.err.println("e == f_e"+" "+e);
+						System.err.println("e == f_e"+" "+e);	
 					}
 				}
 			}
