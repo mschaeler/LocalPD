@@ -100,7 +100,7 @@ public class Graph {
 		boolean[][] neighbors = new boolean[this.num_vertices][this.num_vertices];
 		for(Egde e : edges) {
 			if(neighbors[e.from][e.to] == true) {
-				System.err.println("get_adjancency_matrix_as_bit_vector(): Duplicate edge");
+				System.err.println("get_adjancency_matrix_as_bit_vector(): Duplicate edge "+e);
 			}
 			neighbors[e.from][e.to] = true;
 		}

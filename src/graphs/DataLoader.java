@@ -13,6 +13,37 @@ import java.util.Map.Entry;
 
 public class DataLoader {
 	public static String data_file = "./data/enron-mysqldump.sql";
+	public static final int ADVOGATO 		  = 0;
+	public static final int ENRON_MULTI_EDGE  = 1;
+	public static final int ENRON_SINGLE_EDGE = 2;
+	
+	public static HashMap<String, Integer> data_set_ids_by_name = new HashMap<String, Integer>(10);
+	static{
+		data_set_ids_by_name.put("ADVOGATO", ADVOGATO);
+		data_set_ids_by_name.put("ADVOGATO".toLowerCase(), ADVOGATO);
+		data_set_ids_by_name.put("ENRON", ENRON_SINGLE_EDGE);
+		data_set_ids_by_name.put("ENRON".toLowerCase(), ENRON_SINGLE_EDGE);
+	}
+	
+	public static Graph get_graph(String name){
+		return get_graph(data_set_ids_by_name.get(name));
+	}
+	
+	public static Graph get_graph(Integer id){
+		if(id==ADVOGATO) {
+			return get_advogato_graph();
+		}else if(id==ENRON_MULTI_EDGE) {
+			return get_enron_graph();
+		}else if(id==ENRON_SINGLE_EDGE) {
+			Graph g = DataLoader.get_enron_graph();
+			g = Graph.dedup_edges(g);
+			return g;
+		}else{
+			System.err.println("get_graph("+id+") Unkown id");
+			return null;
+		}
+	}
+	
 	static Graph get_enron_graph(){
 		final String is_message = "INSERT INTO message VALUES (";
 		final String is_recipient = "INSERT INTO recipientinfo VALUES (";
