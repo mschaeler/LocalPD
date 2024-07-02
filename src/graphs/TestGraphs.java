@@ -3,6 +3,10 @@ package graphs;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import results.CentralityResult;
+import results.Results;
+import results.Statistics;
+
 public class TestGraphs {
 	static int num_repitions = 3;	
 	
@@ -15,6 +19,7 @@ public class TestGraphs {
 		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
 		ArrayList<double[]> all_metrics = new ArrayList<double[]>();
+		ArrayList<Double> all_centralities = new ArrayList<Double>();
 		
 		for(double epsilon  : all_eps) {
 			System.out.print("**************eps="+epsilon+"\t");
@@ -25,10 +30,13 @@ public class TestGraphs {
 			}
 			double[] metrics = Metrics.statistics(g, all_san_g);
 			all_metrics.add(metrics);
-			System.out.println(Arrays.toString(metrics));
+			double avg_centralities = Metrics.avg(Metrics.page_rank(g, all_san_g));
+			all_centralities.add(avg_centralities);
 		}
 		
-		Metrics.out("Randomized response num_repitions="+num_repitions, all_eps, all_metrics);
+		String name = "Randomized response num_repitions="+num_repitions;
+		new CentralityResult(name, all_eps, all_centralities);
+		new Statistics(name, all_eps, all_metrics);
 	}
 	
 	static void run_sequential_comp() {
@@ -39,6 +47,7 @@ public class TestGraphs {
 		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
 		ArrayList<double[]> all_metrics = new ArrayList<double[]>();
+		ArrayList<Double> all_centralities = new ArrayList<Double>();
 		double e_q1 = 1;
 		
 		for(double epsilon  : all_eps) {
@@ -51,9 +60,13 @@ public class TestGraphs {
 			}
 			double[] metrics = Metrics.statistics(g, all_san_g);
 			all_metrics.add(metrics);
+			double avg_centralities = Metrics.avg(Metrics.page_rank(g, all_san_g));
+			all_centralities.add(avg_centralities);
 		}
 		
-		Metrics.out("k-edge with seq compostion e_q1="+e_q1+" num_repitions="+num_repitions, all_eps, all_metrics);
+		String name = "k-edge with seq compostion e_q1="+e_q1+" num_repitions="+num_repitions;
+		new CentralityResult(name, all_eps, all_centralities);
+		new Statistics(name, all_eps, all_metrics);
 	}
 	
 	static void run_k_edge_non_private_grouping() {
@@ -64,6 +77,7 @@ public class TestGraphs {
 		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
 		ArrayList<double[]> all_metrics = new ArrayList<double[]>();
+		ArrayList<Double> all_centralities = new ArrayList<Double>();
 		double e_q1 = 1;
 		
 		for(double epsilon  : all_eps) {
@@ -76,9 +90,13 @@ public class TestGraphs {
 			}
 			double[] metrics = Metrics.statistics(g, all_san_g);
 			all_metrics.add(metrics);
+			double avg_centralities = Metrics.avg(Metrics.page_rank(g, all_san_g));
+			all_centralities.add(avg_centralities);
 		}
 		
-		Metrics.out("k-edge with non-private grouping e_q1="+e_q1+" num_repitions="+num_repitions, all_eps, all_metrics);
+		String name = "k-edge with non-private grouping e_q1="+e_q1+" num_repitions="+num_repitions;
+		new CentralityResult(name, all_eps, all_centralities);
+		new Statistics(name, all_eps, all_metrics);
 	}
 	
 	static void run_k_edge_grouping() {
@@ -89,6 +107,7 @@ public class TestGraphs {
 		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
 		ArrayList<double[]> all_metrics = new ArrayList<double[]>();
+		ArrayList<Double> all_centralities = new ArrayList<Double>();
 		double e_q1 = 1;
 		
 		for(double epsilon  : all_eps) {
@@ -101,14 +120,24 @@ public class TestGraphs {
 			}
 			double[] metrics = Metrics.statistics(g, all_san_g);
 			all_metrics.add(metrics);
+			double avg_centralities = Metrics.avg(Metrics.page_rank(g, all_san_g));
+			all_centralities.add(avg_centralities);
 		}
 		
-		Metrics.out("k-edge with -private grouping e_q1="+e_q1+" num_repitions="+num_repitions, all_eps, all_metrics);
+		String name = "k-edge with private grouping e_q1="+e_q1+" num_repitions="+num_repitions;
+		//Metrics.out(name, all_eps, all_metrics);
+		new CentralityResult(name, all_eps, all_centralities);
+		new Statistics(name, all_eps, all_metrics);
 	}
 	
 
 	public static void main(String[] args) {
+		run_randomized_response();
+		run_k_edge_non_private_grouping();
+		run_sequential_comp();
 		run_k_edge_grouping();
+		Results.all_out();
+		
 		/*Graph example = Graph.get_example();
 		System.out.println(example);
 		Mechanism.two_k_series(example);

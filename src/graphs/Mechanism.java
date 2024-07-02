@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Random;
 
+import algorithms.LaplaceStream;
+
 public class Mechanism {
 	public static boolean use_safe_variant = false;//usually much fast. sufficient for benchmarking, but not suited for productive use
 	

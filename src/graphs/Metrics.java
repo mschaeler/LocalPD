@@ -3,6 +3,8 @@ package graphs;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import algorithms.PageRank;
+
 public class Metrics {
 	public static final int correct_edge 		= 0;
 	public static final int missing_edge 		= 1;
@@ -170,5 +172,49 @@ public class Metrics {
 		}
 
 		return all_mre;
+	}
+	
+	static final double[] page_rank(final Graph original_g, final Graph sanitized_g) {
+		ArrayList<Graph> g_s = new ArrayList<Graph>();
+		g_s.add(sanitized_g);
+		return page_rank(original_g, g_s);
+	}
+	
+	/**
+	 * returns average page_rank delta for each sanitized_gs to original_g
+	 */
+	static final double[] page_rank(final Graph original_g, final ArrayList<Graph> sanitized_gs) {
+		final double[] page_rank_org = PageRank.run(original_g);
+		final double[] result = new double[sanitized_gs.size()];
+		for(int i=0;i<sanitized_gs.size();i++) {
+			final double[] page_rank_san_i = PageRank.run(sanitized_gs.get(i));
+			double delta = abs_avg_delta(page_rank_org, page_rank_san_i);
+			result[i] = delta;
+		}
+		return result;
+	}
+
+	private static double abs_avg_delta(double[] page_rank_org, double[] page_rank_san) {
+		if(page_rank_org.length!=page_rank_san.length) {
+			System.err.println("page_rank_org.length!=page_rank_san.length");
+		}
+		double delta = 0;
+		for(int i=0;i<page_rank_org.length;i++) {
+			delta+=Math.abs(page_rank_org[i]-page_rank_san[i]);
+		}
+		return delta/(double)page_rank_org.length;
+	}
+
+	public static double avg(double[] arr) {
+		double sum = sum(arr);
+		return sum/(double)arr.length;
+	}
+
+	private static double sum(double[] arr) {
+		double sum = 0;
+		for(double  d: arr) {
+			sum+=d;
+		}
+		return sum;
 	}
 }
