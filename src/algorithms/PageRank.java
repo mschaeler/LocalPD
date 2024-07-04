@@ -5,6 +5,8 @@ import java.util.Arrays;
 
 import graphs.Graph;
 
+//TODO test me
+
 public class PageRank {
 	private Graph g;
 	private ArrayList<Integer>[] neighbors;

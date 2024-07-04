@@ -12,20 +12,34 @@ public abstract class Results {
 	}
 	
 	public static void all_out() {
-		System.out.println("*****Results.all_out() Statistics");
-		for(Results r : all_results) {
-			if(r instanceof Statistics) {
-				System.out.println(r.name);
-				r.get_header();
-				r.out();
+		if(Config.USE_RESULT_STATISTICS) {
+			System.out.println("*****Results.all_out() Statistics");
+			for(Results r : all_results) {
+				if(r instanceof Statistics) {
+					System.out.println(r.name);
+					r.get_header();
+					r.out();
+				}
 			}
 		}
-		System.out.println("*****Results.all_out() CentralityResult");
-		for(Results r : all_results) {
-			if(r instanceof CentralityResult) {
-				System.out.println(r.name);
-				r.get_header();
-				r.out();
+		if(Config.USE_RESULT_PAGE_RANK) {
+			System.out.println("*****Results.all_out() PageRankResult");
+			for(Results r : all_results) {
+				if(r instanceof PageRankResult) {
+					System.out.println(r.name);
+					r.get_header();
+					r.out();
+				}
+			}
+		}
+		if(Config.USE_RESULT_PROXIMITY_PRESTIGE) {
+			System.out.println("*****Results.all_out() ProximityPrestigeResult");
+			for(Results r : all_results) {
+				if(r instanceof ProximityPrestigeResult) {
+					System.out.println(r.name);
+					r.get_header();
+					r.out();
+				}
 			}
 		}
 	}

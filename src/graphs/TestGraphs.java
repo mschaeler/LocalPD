@@ -1,25 +1,21 @@
 package graphs;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 
-import results.CentralityResult;
-import results.Results;
-import results.Statistics;
+import results.*;
+
 
 public class TestGraphs {
 	static int num_repitions = 3;	
 	
 	
 	static void run_randomized_response() {
-
+		ResultCollector.init();
 		int graph_id = DataLoader.ADVOGATO;
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
 		
 		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
-		ArrayList<double[]> all_metrics = new ArrayList<double[]>();
-		ArrayList<Double> all_centralities = new ArrayList<Double>();
 		
 		for(double epsilon  : all_eps) {
 			System.out.print("**************eps="+epsilon+"\t");
@@ -28,26 +24,20 @@ public class TestGraphs {
 				Graph san_g = Mechanism.radomized_response(g, epsilon);
 				all_san_g.add(san_g);
 			}
-			double[] metrics = Metrics.statistics(g, all_san_g);
-			all_metrics.add(metrics);
-			double avg_centralities = Metrics.avg(Metrics.page_rank(g, all_san_g));
-			all_centralities.add(avg_centralities);
+			ResultCollector.collect(g, all_san_g);
 		}
 		
 		String name = "Randomized response num_repitions="+num_repitions;
-		new CentralityResult(name, all_eps, all_centralities);
-		new Statistics(name, all_eps, all_metrics);
+		ResultCollector.store(name, all_eps);
 	}
 	
 	static void run_sequential_comp() {
-		
+		ResultCollector.init();
 		int graph_id = DataLoader.ADVOGATO;	
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
 		
 		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
-		ArrayList<double[]> all_metrics = new ArrayList<double[]>();
-		ArrayList<Double> all_centralities = new ArrayList<Double>();
 		double e_q1 = 1;
 		
 		for(double epsilon  : all_eps) {
@@ -58,26 +48,21 @@ public class TestGraphs {
 				Graph san_g = Mechanism.k_edge_radomized_response_non_private_grouping(g, epsilon, e_q1, true);
 				all_san_g.add(san_g);
 			}
-			double[] metrics = Metrics.statistics(g, all_san_g);
-			all_metrics.add(metrics);
-			double avg_centralities = Metrics.avg(Metrics.page_rank(g, all_san_g));
-			all_centralities.add(avg_centralities);
+			ResultCollector.collect(g, all_san_g);
 		}
 		
 		String name = "k-edge with seq compostion e_q1="+e_q1+" num_repitions="+num_repitions;
-		new CentralityResult(name, all_eps, all_centralities);
-		new Statistics(name, all_eps, all_metrics);
+		ResultCollector.store(name, all_eps);
 	}
 	
 	static void run_k_edge_non_private_grouping() {
+		ResultCollector.init();
 		int graph_id = DataLoader.ADVOGATO;
 		
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
 		
 		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
-		ArrayList<double[]> all_metrics = new ArrayList<double[]>();
-		ArrayList<Double> all_centralities = new ArrayList<Double>();
 		double e_q1 = 1;
 		
 		for(double epsilon  : all_eps) {
@@ -88,26 +73,21 @@ public class TestGraphs {
 				Graph san_g = Mechanism.k_edge_radomized_response_non_private_grouping(g, epsilon, e_q1, false);
 				all_san_g.add(san_g);
 			}
-			double[] metrics = Metrics.statistics(g, all_san_g);
-			all_metrics.add(metrics);
-			double avg_centralities = Metrics.avg(Metrics.page_rank(g, all_san_g));
-			all_centralities.add(avg_centralities);
+			ResultCollector.collect(g, all_san_g);
 		}
 		
 		String name = "k-edge with non-private grouping e_q1="+e_q1+" num_repitions="+num_repitions;
-		new CentralityResult(name, all_eps, all_centralities);
-		new Statistics(name, all_eps, all_metrics);
+		ResultCollector.store(name, all_eps);
 	}
 	
 	static void run_k_edge_grouping() {
+		ResultCollector.init();
 		int graph_id = DataLoader.ADVOGATO;
 		
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
 		
 		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
-		ArrayList<double[]> all_metrics = new ArrayList<double[]>();
-		ArrayList<Double> all_centralities = new ArrayList<Double>();
 		double e_q1 = 1;
 		
 		for(double epsilon  : all_eps) {
@@ -118,25 +98,21 @@ public class TestGraphs {
 				Graph san_g = Mechanism.k_edge_radomized_response_partitioned(g, epsilon, e_q1);
 				all_san_g.add(san_g);
 			}
-			double[] metrics = Metrics.statistics(g, all_san_g);
-			all_metrics.add(metrics);
-			double avg_centralities = Metrics.avg(Metrics.page_rank(g, all_san_g));
-			all_centralities.add(avg_centralities);
+			ResultCollector.collect(g, all_san_g);
 		}
 		
 		String name = "k-edge with private grouping e_q1="+e_q1+" num_repitions="+num_repitions;
-		//Metrics.out(name, all_eps, all_metrics);
-		new CentralityResult(name, all_eps, all_centralities);
-		new Statistics(name, all_eps, all_metrics);
+		ResultCollector.store(name, all_eps);
 	}
 	
 
 	public static void main(String[] args) {
+		//algorithms.ProximityPrestige.run(DataLoader.get_advogato_graph());
 		run_randomized_response();
-		run_k_edge_non_private_grouping();
-		run_sequential_comp();
-		run_k_edge_grouping();
-		Results.all_out();
+		//run_k_edge_non_private_grouping();
+		//run_sequential_comp();
+		//run_k_edge_grouping();
+		results.Results.all_out();
 		
 		/*Graph example = Graph.get_example();
 		System.out.println(example);

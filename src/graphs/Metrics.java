@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import algorithms.PageRank;
+import algorithms.ProximityPrestige;
+import algorithms.ProximityPrestige.InfDom;
 
 public class Metrics {
 	public static final int correct_edge 		= 0;
@@ -31,7 +33,7 @@ public class Metrics {
 		return s;
 	}
 
-	static final double[] statistics(Graph original_g, ArrayList<Graph> sanitized_gs) {
+	public static final double[] statistics(Graph original_g, ArrayList<Graph> sanitized_gs) {
 		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
 		ArrayList<double[]> all_sums = new ArrayList<double[]>();
 		
@@ -183,7 +185,7 @@ public class Metrics {
 	/**
 	 * returns average page_rank delta for each sanitized_gs to original_g
 	 */
-	static final double[] page_rank(final Graph original_g, final ArrayList<Graph> sanitized_gs) {
+	public static final double[] page_rank(final Graph original_g, final ArrayList<Graph> sanitized_gs) {
 		final double[] page_rank_org = PageRank.run(original_g);
 		final double[] result = new double[sanitized_gs.size()];
 		for(int i=0;i<sanitized_gs.size();i++) {
@@ -192,6 +194,61 @@ public class Metrics {
 			result[i] = delta;
 		}
 		return result;
+	}
+
+	/**
+	 * returns average proximity prestige delta for each sanitized_gs to original_g
+	 */
+	public static final double[] proximity_prestige(final Graph original_g, final ArrayList<Graph> sanitized_gs) {
+		final double[][] pp_org = ProximityPrestige.run(original_g);
+		ArrayList<double[]> temp_results = new ArrayList<double[]>(sanitized_gs.size());
+		
+		for(int i=0;i<sanitized_gs.size();i++) {
+			final double[][] pp_san_i = ProximityPrestige.run(sanitized_gs.get(i));
+			double[] deltas = abs_avg_delta(pp_org, pp_san_i);//[I,avg dist(),pp]
+			temp_results.add(deltas);
+		}
+		
+		final double[] result = avg(temp_results);
+		
+		return result;
+	}
+	
+	private static double[] avg(ArrayList<double[]> temp_results) {
+		int size = temp_results.size();
+		int width = temp_results.get(0).length;
+		double[] results = new double[width]; 
+		
+		for(double[] arr : temp_results) {
+			for(int i=0;i<results.length;i++) {
+				results[i] += arr[i];
+			}
+		}
+		
+		for(int i=0;i<results.length;i++) {
+			results[i] /= (double)size;
+		}
+		
+		return results;
+	}
+
+	private static double[] abs_avg_delta(double[][] pp_org, double[][] pp_san_i) {
+		if(pp_org.length!=pp_san_i.length) {
+			System.err.println("pp_org.length!=pp_san_i.length");
+		}
+		double[] agg_results = new double[pp_org[0].length];
+		for(int node=0;node<pp_org.length;node++) {
+			double[] org_r = pp_org[node];
+			double[] san_r = pp_san_i[node];
+			for(int i=0;i<agg_results.length;i++) {
+				agg_results[i] += Math.abs(org_r[i]-san_r[i]);
+			}
+		}
+		double size = pp_org.length;
+		for(int i=0;i<agg_results.length;i++) {
+			agg_results[i] /= size;
+		}
+		return agg_results;
 	}
 
 	private static double abs_avg_delta(double[] page_rank_org, double[] page_rank_san) {

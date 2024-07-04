@@ -81,6 +81,10 @@ public class Graph {
 		}
 		return e;
 	}
+	/**
+	 * outgoing vertices
+	 * @return
+	 */
 	public ArrayList<Integer>[] get_neighbors(){
 		@SuppressWarnings("unchecked")
 		ArrayList<Integer>[] edge_list = new ArrayList[this.num_vertices];
@@ -92,6 +96,20 @@ public class Graph {
 				System.err.println("get_neighbors(): Duplicate edge");
 			}
 			edge_list[e.from].add(e.to);
+		}
+		return edge_list;
+	}
+	public ArrayList<Integer>[] get_incoming_vertices(){
+		@SuppressWarnings("unchecked")
+		ArrayList<Integer>[] edge_list = new ArrayList[this.num_vertices];
+		for(int i=0;i<this.num_vertices;i++) {
+			edge_list[i] = new ArrayList<Integer>();
+		}
+		for(Egde e : edges) {
+			if(edge_list[e.to].contains(e.from)) {
+				System.err.println("get_neighbors(): Duplicate edge");
+			}
+			edge_list[e.to].add(e.from);
 		}
 		return edge_list;
 	}
