@@ -8,7 +8,7 @@ import graphs.Metrics;
 public class ResultCollector {
 	static ArrayList<double[]> all_metrics = new ArrayList<double[]>();
 	static ArrayList<Double> all_page_rank = new ArrayList<Double>();
-	static ArrayList<double[]> all_proximity_prestige = new ArrayList<double[]>();
+	public static ArrayList<double[]> all_proximity_prestige = new ArrayList<double[]>();
 	
 	
 	public static void init() {
@@ -26,12 +26,11 @@ public class ResultCollector {
 			all_page_rank.add(avg_centralities);	
 		}
 		if(Config.USE_RESULT_PROXIMITY_PRESTIGE) {
-			double[] metrics = Metrics.proximity_prestige(g, all_san_g);
-			all_metrics.add(metrics);	
+			double[] metrics = Metrics.proximity_prestige(all_san_g);
+			all_proximity_prestige.add(metrics);	
 		}
-		
-		
 	}
+
 	public static void store(String name, double[] all_eps){
 		if(Config.USE_RESULT_STATISTICS) {
 			new Statistics(name, all_eps, all_metrics);	
@@ -40,7 +39,7 @@ public class ResultCollector {
 			new PageRankResult(name, all_eps, all_page_rank);	
 		}
 		if(Config.USE_RESULT_PROXIMITY_PRESTIGE) {
-			new ProximityPrestigeResult(name, all_eps, all_metrics);
+			new ProximityPrestigeResult(name, all_eps, all_proximity_prestige);
 		}
 	}
 }

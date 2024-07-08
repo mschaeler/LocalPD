@@ -72,9 +72,9 @@ public class ProximityPrestige {
 		InfDom[] temp = new ProximityPrestige(g).run();
 		double[][] pp_raw = new double[temp.length][3];
 		for(int node=0;node<g.num_vertices;node++) {
-			pp_raw[node][0] = temp[node].size_influence_domain();
-			pp_raw[node][1] = temp[node].average_length_of_shortest_path();
-			pp_raw[node][2] = temp[node].get_proximity_prestige();
+			pp_raw[node][0] = temp[node].size_influence_domain;
+			pp_raw[node][1] = temp[node].average_length_of_shortest_path;
+			pp_raw[node][2] = temp[node].proximity_prestige;
 		}
 		return pp_raw;
 	}
@@ -92,19 +92,27 @@ public class ProximityPrestige {
 	public class InfDom{
 		int node;
 		ArrayList<HashSet<Integer>> inf_dom;
+		
+		final int size_influence_domain;
+		final double average_length_of_shortest_path;
+		final double proximity_prestige;
+		
 		public InfDom(int node, ArrayList<HashSet<Integer>> inf_dom) {
 			this.node = node;
 			this.inf_dom = inf_dom;
+			this.size_influence_domain = size_influence_domain1();
+			this.average_length_of_shortest_path = average_length_of_shortest_path1();
+			this.proximity_prestige = get_proximity_prestige1();
 		}
-		public int size_influence_domain(){
+		private int size_influence_domain1(){
 			int size = 0;
 			for(HashSet<Integer> i : inf_dom) {
 				size +=i.size();
 			}
 			return size;
 		}
-		public double average_length_of_shortest_path() {
-			double size_inf_dom = size_influence_domain();
+		private double average_length_of_shortest_path1() {
+			double size_inf_dom = size_influence_domain;
 			if(size_inf_dom==0) {
 				return 0;
 			}
@@ -117,11 +125,11 @@ public class ProximityPrestige {
 			}
 			return sum_distance / size_inf_dom;
 		}
-		public double get_proximity_prestige() {
-			double size_i = size_influence_domain();
+		private double get_proximity_prestige1() {
+			double size_i = size_influence_domain;
 			if(size_i>0) {
 				double nominator = size_i / (double)(g.num_vertices-1);
-				double denominator = influence_domains[node].average_length_of_shortest_path(); 
+				double denominator = average_length_of_shortest_path; 
 				double pp = nominator / denominator;	
 				if(nominator>denominator) {
 					System.err.println("nominator>denominator");

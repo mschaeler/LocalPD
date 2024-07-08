@@ -47,7 +47,7 @@ public abstract class Results {
 	public abstract void get_header();
 	public abstract void out();
 	
-	static String to_tsv(double[] arr) {
+	public static String to_tsv(double[] arr) {
 		if(arr==null) {
 			return "null";
 		}

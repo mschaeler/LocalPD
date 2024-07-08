@@ -5,21 +5,24 @@ import java.util.HashSet;
 
 public class Graph {
 	int id_e = 0;
+	final String name;
 	
 	public int num_vertices;
 	private final ArrayList<Egde> edges = new ArrayList<Graph.Egde>();
 	
-	public Graph(int num_vertices) {
+	public Graph(int num_vertices, String name) {
 		this.num_vertices = num_vertices;//They exist only virtually
+		this.name = name;
 	}
 	
-	public Graph(boolean[][] adjacency_matrix) {
+	public Graph(boolean[][] adjacency_matrix, String name) {
 		int num_lines 	= adjacency_matrix.length;
 		int num_columns = adjacency_matrix[0].length;
 		if(num_lines!=num_columns) {
 			System.err.println("Graph(bool[][]): num_lines!=num_columns");
 		}
 		this.num_vertices = num_lines;
+		this.name = name;
 		for(int l=0;l<num_lines;l++) {
 			for(int c=0;c<num_columns;c++) {
 				if(adjacency_matrix[l][c]) {//there is an edge
@@ -29,8 +32,8 @@ public class Graph {
 		}
 	}
 
-	public Graph(ArrayList<Integer>[] neighbor_list) {
-		this(neighbor_list.length);
+	public Graph(ArrayList<Integer>[] neighbor_list, String name) {
+		this(neighbor_list.length, name);
 		for(int node=0;node<neighbor_list.length;node++) {
 			for(int target : neighbor_list[node]) {
 				new Egde(node,target);
@@ -126,7 +129,7 @@ public class Graph {
 	}
 	
 	public static Graph get_example() {
-		Graph g = new Graph(60);
+		Graph g = new Graph(60,"example");
 		g.add_edge(1-1,2-1);
 		g.add_edge(2-1,4-1);
 		g.add_edge(3-1,1-1);
@@ -141,7 +144,7 @@ public class Graph {
 	
 	public String toString() {
 		StringBuffer sb = new StringBuffer();
-		sb.append("Graph with "+this.num_vertices+" vertices and "+this.edges.size()+" edges");
+		sb.append(this.name+" Graph with "+this.num_vertices+" vertices and "+this.edges.size()+" edges");
 		
 		
 		//String ret = "Graph with "+this.num_vertices+" vertices and "+this.edges.size()+" edges";
@@ -164,7 +167,7 @@ public class Graph {
 		System.out.println("dedup_edges(Graph g) Input:");
 		System.out.println(input);
 		
-		Graph output = new Graph(input.num_vertices);//creates graph with not edges
+		Graph output = new Graph(input.num_vertices, input.name+"_dedup");//creates graph with not edges
 		HashSet<ArrayList<Integer>> unique_edges = new HashSet<ArrayList<Integer>>(input.num_vertices);
 		int counter = 0;
 		for(Egde e : input.edges) {

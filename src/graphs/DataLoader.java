@@ -12,17 +12,20 @@ import java.util.HashSet;
 import java.util.Map.Entry;
 
 public class DataLoader {
-	public static String data_file = "./data/enron-mysqldump.sql";
+	private static String data_file = "./data/enron-mysqldump.sql";
 	public static final int ADVOGATO 		  = 0;
 	public static final int ENRON_MULTI_EDGE  = 1;
 	public static final int ENRON_SINGLE_EDGE = 2;
+	public static final int CONGRESS_TWITTER  = 3;
 	
-	public static HashMap<String, Integer> data_set_ids_by_name = new HashMap<String, Integer>(10);
+	private static HashMap<String, Integer> data_set_ids_by_name = new HashMap<String, Integer>(10);
 	static{
 		data_set_ids_by_name.put("ADVOGATO", ADVOGATO);
 		data_set_ids_by_name.put("ADVOGATO".toLowerCase(), ADVOGATO);
 		data_set_ids_by_name.put("ENRON", ENRON_SINGLE_EDGE);
 		data_set_ids_by_name.put("ENRON".toLowerCase(), ENRON_SINGLE_EDGE);
+		data_set_ids_by_name.put("CONGRESS", CONGRESS_TWITTER);
+		data_set_ids_by_name.put("CONGRESS".toLowerCase(), CONGRESS_TWITTER);
 	}
 	
 	public static Graph get_graph(String name){
@@ -38,6 +41,8 @@ public class DataLoader {
 			Graph g = DataLoader.get_enron_graph();
 			g = Graph.dedup_edges(g);
 			return g;
+		}else if(id==CONGRESS_TWITTER) {
+			return get_congress_twitter_graph();
 		}else{
 			System.err.println("get_graph("+id+") Unkown id");
 			return null;
@@ -111,7 +116,7 @@ public class DataLoader {
 				node_to_id.put(nodes[id], id);
 			}
 			
-			Graph g = new Graph(all_email_adresses.size());
+			Graph g = new Graph(all_email_adresses.size(), "enron");
 			for(String[] message : from) {
 				String mid = message[0];
 				final int start_vertex = node_to_id.get(message[1]);
@@ -227,7 +232,7 @@ public class DataLoader {
 				node_to_id.put(nodes[id], id);
 			}
 			
-			Graph g = new Graph(all_email_adresses.size());
+			Graph g = new Graph(all_email_adresses.size(),"enron unique e");
 			for(String[] message : from) {
 				String mid = message[0];
 				final int start_vertex = node_to_id.get(message[1]);
@@ -250,14 +255,14 @@ public class DataLoader {
 		}
 	}
 	
-	public static String advogato_edges = "./data/advogato_edges.csv";
-	public static String advogato_nodes = "./data/advogato_nodes.csv";
+	private static String advogato_edges = "./data/advogato_edges.csv";
+	private static String advogato_nodes = "./data/advogato_nodes.csv";
 	
 	static Graph get_advogato_graph() {
 		final int source_offset = 0;
 		final int target_offset = 1;
 		final int num_node = 6541;//According to advogato_nodes [0,6540]
-		Graph g = new Graph(num_node);
+		Graph g = new Graph(num_node, "advogato");
 		
 		File f = new File(advogato_edges);
 		if(f.exists()) {
@@ -267,6 +272,47 @@ public class DataLoader {
 				
 				while((line = br.readLine()) != null) {
 					String tokens[] = line.split(",");
+					int source = Integer.parseInt(tokens[source_offset]);
+					int target = Integer.parseInt(tokens[target_offset]);
+					if(source<num_node && source>=0) {
+						if(target<num_node && target>=0) {
+							g.add_edge(source, target);
+						}else{
+							System.err.println("target<num_node && target>=0");
+						}
+					}else{
+						System.err.println("source<num_node && source>=0");
+					}
+				}
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			System.out.println(g);
+			return g;
+		}else{
+			System.err.println(f+" does not exist");
+			return null;
+		}
+	}
+	
+	private static String congress_twitter = "./data/congress.edgelist";
+	
+	static Graph get_congress_twitter_graph() {
+		final int source_offset = 0;
+		final int target_offset = 1;
+		final int num_node = 475;//According to https://snap.stanford.edu/data/congress-twitter.html
+		Graph g = new Graph(num_node, "congress");
+		
+		File f = new File(congress_twitter);
+		if(f.exists()) {
+			try(BufferedReader br = new BufferedReader(new FileReader(f))){
+				String line;
+				
+				while((line = br.readLine()) != null) {
+					String tokens[] = line.split(" ");
 					int source = Integer.parseInt(tokens[source_offset]);
 					int target = Integer.parseInt(tokens[target_offset]);
 					if(source<num_node && source>=0) {

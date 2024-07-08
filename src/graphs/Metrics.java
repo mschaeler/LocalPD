@@ -6,6 +6,7 @@ import java.util.Arrays;
 import algorithms.PageRank;
 import algorithms.ProximityPrestige;
 import algorithms.ProximityPrestige.InfDom;
+import results.ResultCollector;
 
 public class Metrics {
 	public static final int correct_edge 		= 0;
@@ -212,6 +213,55 @@ public class Metrics {
 		final double[] result = avg(temp_results);
 		
 		return result;
+	}
+	/**
+	 * returns average proximity per sanitized graph
+	 */
+	public static final double[] proximity_prestige(final ArrayList<Graph> sanitized_gs) {
+		ArrayList<double[]> temp_results = new ArrayList<double[]>(sanitized_gs.size());
+		
+		for(int i=0;i<sanitized_gs.size();i++) {
+			final double[][] pp_san_i = ProximityPrestige.run(sanitized_gs.get(i));
+			double[] arr = avg(pp_san_i);//[I,avg dist(),pp]
+			temp_results.add(arr);
+		}
+		
+		final double[] result = avg(temp_results);
+		
+		return result;
+	}
+	
+	/**
+	 * returns average proximity prestige delta for each sanitized_gs to original_g
+	 */
+	public static final double[] proximity_prestige(final Graph original_g) {
+		ResultCollector.init();
+		final double[][] pp_org = ProximityPrestige.run(original_g);
+		final double[] result = avg(pp_org);
+		ResultCollector.all_proximity_prestige.add(result);
+		String name = "org g";
+		double[] all_eps = {-1};
+		ResultCollector.store(name, all_eps);
+		
+		return result;
+	}
+	
+	private static double[] avg(double[][] temp_results) {
+		int size = temp_results.length;
+		int width = temp_results[0].length;
+		double[] results = new double[width]; 
+		
+		for(double[] arr : temp_results) {
+			for(int i=0;i<results.length;i++) {
+				results[i] += arr[i];
+			}
+		}
+		
+		for(int i=0;i<results.length;i++) {
+			results[i] /= (double)size;
+		}
+		
+		return results;
 	}
 	
 	private static double[] avg(ArrayList<double[]> temp_results) {

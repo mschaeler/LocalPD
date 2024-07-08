@@ -9,12 +9,9 @@ public class TestGraphs {
 	static int num_repitions = 3;	
 	
 	
-	static void run_randomized_response() {
+	static void run_randomized_response(Graph g) {
 		ResultCollector.init();
-		int graph_id = DataLoader.ADVOGATO;
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-		
-		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
 		
 		for(double epsilon  : all_eps) {
@@ -31,12 +28,9 @@ public class TestGraphs {
 		ResultCollector.store(name, all_eps);
 	}
 	
-	static void run_sequential_comp() {
-		ResultCollector.init();
-		int graph_id = DataLoader.ADVOGATO;	
+	static void run_sequential_comp(Graph g) {
+		ResultCollector.init();	
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-		
-		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
 		double e_q1 = 1;
 		
@@ -45,23 +39,19 @@ public class TestGraphs {
 			
 			ArrayList<Graph> all_san_g = new ArrayList<Graph>(all_eps.length);
 			for(int i=0;i<num_repitions;i++) {
-				Graph san_g = Mechanism.k_edge_radomized_response_non_private_grouping(g, epsilon, e_q1, true);
+				Graph san_g = Mechanism.k_edge_radomized_response_non_private_grouping_rr_fallback(g, epsilon, e_q1, true);
 				all_san_g.add(san_g);
 			}
 			ResultCollector.collect(g, all_san_g);
 		}
 		
-		String name = "k-edge with seq compostion e_q1="+e_q1+" num_repitions="+num_repitions;
+		String name = "k-edge with seq compostion (with fall_back) e_q1="+e_q1+" num_repitions="+num_repitions;
 		ResultCollector.store(name, all_eps);
 	}
 	
-	static void run_k_edge_non_private_grouping() {
+	static void run_k_edge_non_private_grouping(Graph g) {
 		ResultCollector.init();
-		int graph_id = DataLoader.ADVOGATO;
-		
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-		
-		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
 		double e_q1 = 1;
 		
@@ -70,7 +60,7 @@ public class TestGraphs {
 			
 			ArrayList<Graph> all_san_g = new ArrayList<Graph>(all_eps.length);
 			for(int i=0;i<num_repitions;i++) {
-				Graph san_g = Mechanism.k_edge_radomized_response_non_private_grouping(g, epsilon, e_q1, false);
+				Graph san_g = Mechanism.k_edge_radomized_response_non_private_grouping_rr_fallback(g, epsilon, e_q1, false);
 				all_san_g.add(san_g);
 			}
 			ResultCollector.collect(g, all_san_g);
@@ -80,13 +70,9 @@ public class TestGraphs {
 		ResultCollector.store(name, all_eps);
 	}
 	
-	static void run_k_edge_grouping() {
+	static void run_k_edge_grouping(Graph g) {
 		ResultCollector.init();
-		int graph_id = DataLoader.ADVOGATO;
-		
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-		
-		Graph g = DataLoader.get_graph(graph_id);
 		System.out.println(g);
 		double e_q1 = 1;
 		
@@ -107,11 +93,15 @@ public class TestGraphs {
 	
 
 	public static void main(String[] args) {
-		//algorithms.ProximityPrestige.run(DataLoader.get_advogato_graph());
-		run_randomized_response();
-		//run_k_edge_non_private_grouping();
-		//run_sequential_comp();
-		//run_k_edge_grouping();
+		//Config.USE_RESULT_STATISTICS = true;
+		Config.USE_RESULT_PROXIMITY_PRESTIGE = true;
+		Graph g = DataLoader.get_graph(DataLoader.ADVOGATO);
+		
+		Metrics.proximity_prestige(g);
+		//run_randomized_response(g);
+		//run_k_edge_non_private_grouping(g);
+		run_sequential_comp(g);
+		//run_k_edge_grouping(g);
 		results.Results.all_out();
 		
 		/*Graph example = Graph.get_example();
