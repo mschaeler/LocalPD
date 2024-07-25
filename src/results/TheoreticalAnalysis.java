@@ -93,7 +93,7 @@ public class TheoreticalAnalysis {
 		}
 	}
 	
-	static double[] error_k_edge_random_part(double neighbor_count, double epsilon) {
+	public static double[] error_k_edge_random_part(double neighbor_count, double epsilon) {
 		double e_1 = 1;
 		double e_2 = epsilon-e_1;
 		double error_q1 = 1/e_1;

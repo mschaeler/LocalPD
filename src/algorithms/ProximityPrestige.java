@@ -1,6 +1,7 @@
 package algorithms;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashSet;
 
 import graphs.Graph;
@@ -21,9 +22,47 @@ public class ProximityPrestige {
 		double start = System.currentTimeMillis();
 		System.out.print("get_influence_domain() ");
 		for(int node=0;node<g.num_vertices;node++) {
-			influence_domains[node] = new InfDom(node, get_influence_domain(node));
+			//influence_domains[node] = new InfDom(node, get_influence_domain(node));
+			influence_domains[node] = new InfDom(get_influence_domain_v02(node), node);
 		}
 		System.out.println("[Done] in "+(System.currentTimeMillis()-start)+" ms");
+	}
+	
+	ArrayList<BitSet> get_influence_domain_v02(int node){
+		ArrayList<BitSet> influence_domain = new ArrayList<BitSet>();
+		boolean[] reachible = new boolean[g.num_vertices];
+		
+		reachible[node] = true;
+		
+		influence_domain.add(new BitSet(g.num_vertices));
+		for(int my_direct_neighbor : incoming_vertices[node]) {
+			if(!reachible[my_direct_neighbor]) {
+				influence_domain.get(0).set(my_direct_neighbor);
+				reachible[my_direct_neighbor] = true;
+			}
+		}
+		
+		while(true) {
+			BitSet last_round_new_reachible_nodes = influence_domain.get(influence_domain.size()-1);
+			if(last_round_new_reachible_nodes.isEmpty()) {
+				return influence_domain;// may be empty directly after start for isolated nodes
+			}else{
+				BitSet new_reachibles = new BitSet();
+				for(int start_node = last_round_new_reachible_nodes.nextSetBit(0); start_node >-1; start_node = last_round_new_reachible_nodes.nextSetBit(start_node + 1)) {
+					for(int my_direct_neighbor : incoming_vertices[start_node]) {
+						if(!reachible[my_direct_neighbor]) {
+							new_reachibles.set(my_direct_neighbor);
+							reachible[my_direct_neighbor] = true;
+						}
+					}
+				}
+				if(new_reachibles.isEmpty()) {
+					return influence_domain;
+				}else{
+					influence_domain.add(new_reachibles);	
+				}
+			}
+		}
 	}
 	
 	ArrayList<HashSet<Integer>> get_influence_domain(int node){
@@ -91,7 +130,7 @@ public class ProximityPrestige {
 
 	public class InfDom{
 		int node;
-		ArrayList<HashSet<Integer>> inf_dom;
+		//ArrayList<HashSet<Integer>> inf_dom;
 		
 		final int size_influence_domain;
 		final double average_length_of_shortest_path;
@@ -99,19 +138,47 @@ public class ProximityPrestige {
 		
 		public InfDom(int node, ArrayList<HashSet<Integer>> inf_dom) {
 			this.node = node;
-			this.inf_dom = inf_dom;
-			this.size_influence_domain = size_influence_domain1();
-			this.average_length_of_shortest_path = average_length_of_shortest_path1();
+			//this.inf_dom = inf_dom;
+			this.size_influence_domain = size_influence_domain1(inf_dom);
+			this.average_length_of_shortest_path = average_length_of_shortest_path1(inf_dom);
 			this.proximity_prestige = get_proximity_prestige1();
 		}
-		private int size_influence_domain1(){
+		public InfDom(ArrayList<BitSet> inf_dom, int node) {
+			this.node = node;
+			//this.inf_dom = inf_dom;
+			this.size_influence_domain = size_influence_domain(inf_dom);
+			this.average_length_of_shortest_path = average_length_of_shortest_path(inf_dom);
+			this.proximity_prestige = get_proximity_prestige1();
+		}
+		private double average_length_of_shortest_path(ArrayList<BitSet> inf_dom) {
+			double size_inf_dom = size_influence_domain;
+			if(size_inf_dom==0) {
+				return 0;
+			}
+			//We exploit that the incoming nodes are grouped by distance
+			double distance_group = 1;
+			double sum_distance   = 0;
+			for(BitSet group : inf_dom) {
+				sum_distance += group.cardinality()*distance_group;
+				distance_group++;
+			}
+			return sum_distance / size_inf_dom;
+		}
+		int size_influence_domain(ArrayList<BitSet> inf_dom) {
+			int size = 0;
+			for(BitSet i : inf_dom) {
+				size +=i.cardinality();
+			}
+			return size;
+		}
+		private int size_influence_domain1(ArrayList<HashSet<Integer>> inf_dom){
 			int size = 0;
 			for(HashSet<Integer> i : inf_dom) {
 				size +=i.size();
 			}
 			return size;
 		}
-		private double average_length_of_shortest_path1() {
+		private double average_length_of_shortest_path1(ArrayList<HashSet<Integer>> inf_dom) {
 			double size_inf_dom = size_influence_domain;
 			if(size_inf_dom==0) {
 				return 0;

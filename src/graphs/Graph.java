@@ -42,19 +42,20 @@ public class Graph {
 	}
 
 	class Egde{
-		final int id;
+		//final int id;
 		final int from;
 		final int to;
 		
 		Egde(int from, int to){
 			this.from = from;
 			this.to   = to;
-			this.id = get_next_edge_id();
+			//this.id = get_next_edge_id();
 			edges.add(this);
 		}
 		
 		public String toString() {
-			return id+" ("+from+"->"+to+")";
+			//return id+" ("+from+"->"+to+")";
+			return "("+from+"->"+to+")";
 		}
 
 		public ArrayList<Integer> to_list() {
@@ -102,6 +103,7 @@ public class Graph {
 		}
 		return edge_list;
 	}
+
 	public ArrayList<Integer>[] get_incoming_vertices(){
 		@SuppressWarnings("unchecked")
 		ArrayList<Integer>[] edge_list = new ArrayList[this.num_vertices];

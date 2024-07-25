@@ -6,10 +6,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Random;
 
 import algorithms.LaplaceStream;
+import misc.TopK;
 import results.TheoreticalAnalysis;
 
 public class Mechanism {
@@ -18,7 +18,7 @@ public class Mechanism {
 	/**
 	 * Determines whether counts are rounded to the next integer > 0
 	 */
-	private static final boolean TRUNCATE = true;
+	private static boolean TRUNCATE = true;
 
 	/**
 	 * Creates a edge-local DP version of the input Graph g. We assume that g is directed.
@@ -322,150 +322,21 @@ public class Mechanism {
 		Graph.stop(start, "k_edge_radomized_response_non_private_grouping_rr_fallback()");
 		return new Graph(sanitized_neighbor_list,g.name+" k_edge_radomized_response_non_private_grouping() use_seq_composition="+use_seq_composition);
 	}
-	
-	public static Graph k_edge_radomized_response_partitioned_v02(Graph g, final double all_epsilon, final double epsilon_q1) {
-		String name = "k_edge_radomized_response_partitioned()";
+
+	public static Graph k_edge_radomized_response_partitioned(Graph g, final double all_epsilon, final double epsilon_q1, boolean rr_fall_back) {
+		String name = "k_edge_radomized_response_partitioned() e="+all_epsilon+" e_1="+epsilon_q1+" rr_fall_back="+rr_fall_back;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
 		Random rand = new Random(123456);
 		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
-		//final boolean[][]  adjancency_matrix = g.get_adjancency_matrix_as_bit_vector();
 		
 		//distribute budget
 		final double count_query_epsilon = epsilon_q1;
 		final double epsilon_q2 = all_epsilon-epsilon_q1;
 		final double p = epsilon_to_p(epsilon_q2);
 		
-		@SuppressWarnings("unchecked")
-		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
-		int[] org_id_to_new_position = new int[g.num_vertices];
-		int[] shuffled_node_ids 	 = new int[g.num_vertices];
-		fill_amd_shuffle(g.num_vertices, rand, org_id_to_new_position, shuffled_node_ids);
-		
-		final boolean[] duplicate_check = new boolean[g.num_vertices];//TODO delete me if all correct
-		
-		for(int node=0;node<g.num_vertices;node++) {
-			Arrays.fill(duplicate_check, false);
-			ArrayList<Integer> my_neighbors = neighbor_list[node];
-			for(int e : my_neighbors) {
-				duplicate_check[e]=true;
-			}
-			
-			//Execute Q1
-			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
-			final int edges_per_group = (int) Math.floor((double)g.num_vertices / sanitized_number_of_outgoing_egdes);
-			final boolean[] group_published = new boolean[sanitized_number_of_outgoing_egdes];
-			
-			//Partition and Shuffle the data - for simplicity all nodes use the same shuffled order, but randomize their fake edge offset
-			int position = 0;
-			ArrayList<Integer> my_sanitized_neighbors = new ArrayList<Integer>(sanitized_number_of_outgoing_egdes);
-			for(;position<Math.min(sanitized_number_of_outgoing_egdes, my_neighbors.size());position++){
-				int edge = my_neighbors.get(position);
-				/*if(node==0 && edge == 87) {
-					System.err.println("s");
-				}*/
-				int group= get_group_number(edge, edges_per_group, org_id_to_new_position, sanitized_number_of_outgoing_egdes);
-				if(!group_published[group]){
-					group_published[group] = true;
-					double dice = rand.nextDouble();
-					if(dice <= (1-p)) {//with probability 1-p return the real value
-						my_sanitized_neighbors.add(edge);
-					}else {//else return some fake neighbor
-						int fake_edge = get_fake_edge_from_group(group, edges_per_group, shuffled_node_ids, rand);//Note, by chance hitting a real edge is ok here.
-						duplicate_check[fake_edge] = true;
-						/*int fake_edge = -1;
-						int counter =0;
-						while(true){
-							fake_edge = get_fake_edge_from_group(group, edges_per_group, shuffled_node_ids, rand);
-							//Sanity check
-							if(!duplicate_check[fake_edge]) {//We may have hit another real edge in this group
-								duplicate_check[fake_edge] = true;
-								break;
-							}else{
-								counter++;
-								if(counter>sanitized_number_of_outgoing_egdes) {
-									fake_edge = -1;
-									for(int i=0;i<edges_per_group;i++) {
-										int offset = edges_per_group*group+i;
-										int f_e = shuffled_node_ids[offset];
-										if(!duplicate_check[f_e]) {
-											fake_edge = f_e;
-											duplicate_check[fake_edge] = true;
-											break;
-										}
-									}
-									System.err.println(fake_edge);
-									break;
-								}
-							}
-						}
-						if(fake_edge!=-1)
-							my_sanitized_neighbors.add(fake_edge);
-						*/
-					}
-				}//else nothing todo
-			}
-			for(int group = 0;group<group_published.length;group++) {
-				if(!group_published[group]) {
-					//I know there is no edge in this group, So i randomly pick one from the group
-					int fake_edge = get_fake_edge_from_group(group, edges_per_group, shuffled_node_ids, rand);
-					//Sanity check
-					if(duplicate_check[fake_edge]) {//TODO delete me
-						int t_g = get_group_number(fake_edge, edges_per_group, org_id_to_new_position, sanitized_number_of_outgoing_egdes);
-						System.err.println("fake_edge="+fake_edge+" group="+group+" t_g="+t_g+" "+my_neighbors.contains(fake_edge));
-						System.err.println("my_neighbors.contains(fake_edge)");
-					}
-					duplicate_check[fake_edge] = true;
-					my_sanitized_neighbors.add(fake_edge);
-				}
-			}
-			
-			
-			sanitized_neighbor_list[node] = my_sanitized_neighbors;
-		}
-		
-		Graph.stop(start, "k_edge_radomized_response_partitioned_v02()");
-		return new Graph(sanitized_neighbor_list, g.name+" "+name);
-	}
-	
-	private static int get_fake_edge_from_group(int group, int edges_per_group, int[] shuffled_node_ids, Random rand) {
-		//I know there is no edge in this group, So i randomly pick one from the group
-		int rand_pos_in_group = rand.nextInt(edges_per_group);
-		int offset = edges_per_group*group+rand_pos_in_group;
-		int fake_edge = shuffled_node_ids[offset];
-		return fake_edge;
-	}
-
-	static int get_group_number(final int edge, final int edges_per_group, final int[] shuffled_edge_ids, int number_of_group) {
-		int position = shuffled_edge_ids[edge];
-		int group_number = position / edges_per_group;
-		return Math.min(group_number, number_of_group-1);
-	}
-	
-	private static void fill_amd_shuffle(int num_vertices, Random rand, int[] org_id_to_new_position, int[] shuffled_node_ids) {
-		List<Integer> temp = new ArrayList<Integer>(num_vertices);
-		for(int id=0;id<num_vertices;id++) {
-			temp.add(id);
-		}
-		Collections.shuffle(temp, rand);
-		
-		for(int position=0;position<num_vertices;position++) {
-			int id = temp.get(position);
-			org_id_to_new_position[id]=position;
-			shuffled_node_ids[position] = id;
-		}
-	}
-
-	public static Graph k_edge_radomized_response_partitioned(Graph g, final double all_epsilon, final double epsilon_q1) {
-		String name = "k_edge_radomized_response_partitioned()";
-		System.out.println(name);
-		double start = System.currentTimeMillis();
-		Random rand = new Random(123456);
-		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
-		
-		//distribute budget
-		final double count_query_epsilon = epsilon_q1;
-		final double epsilon_q2 = all_epsilon-epsilon_q1;
+		final boolean[] adjacency_matrix_line = new boolean[g.num_vertices];
+		final boolean[] sanitized_adjacency_matrix_line = new boolean[g.num_vertices];
 		
 		@SuppressWarnings("unchecked")
 		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
@@ -479,70 +350,67 @@ public class Mechanism {
 			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
 			final int edges_per_group = (int) Math.floor((double)g.num_vertices / sanitized_number_of_outgoing_egdes);
 			
-			//Partition and Shuffle the data
-			Random rand_node = new Random(node);
-			int[] my_neighbors = new int[sanitized_number_of_outgoing_egdes];
-			int[] fake_edges = new int[sanitized_number_of_outgoing_egdes];//
+			//Decide whether we use k-edge or fall back to randomized response
+			double error_rr = TheoreticalAnalysis.error_rr(sanitized_number_of_outgoing_egdes, epsilon_q2, g.num_vertices)[0];
+			double error_k_edge = TheoreticalAnalysis.error_k_edge_random_part(sanitized_number_of_outgoing_egdes, all_epsilon)[0];
+			ArrayList<Integer> my_sanitized_neighbors;
 			
-			for(int group = 0;group<sanitized_number_of_outgoing_egdes;group++) {
-				int my_neighbor_in_group = get_group_edge_or_random(group, neighbor_list[node], sanitized_number_of_outgoing_egdes, edges_per_group, rand_node);
-				my_neighbors[group] = my_neighbor_in_group;
-				if(duplicate_check[my_neighbor_in_group]) {
-					System.err.println("duplicate_check[my_neighbor_in_group] at "+my_neighbor_in_group);
+			if(error_rr<error_k_edge){
+				//System.out.println("Fall back");
+				my_sanitized_neighbors = new ArrayList<Integer>();
+				Arrays.fill(adjacency_matrix_line, false);
+				Arrays.fill(sanitized_adjacency_matrix_line, false);
+				for(int target_node : neighbor_list[node]) {
+					adjacency_matrix_line[target_node] = true;
 				}
-				duplicate_check[my_neighbor_in_group] = true;
+				for(int target_node=0;target_node<g.num_vertices;target_node++) {
+					double dice = rand.nextDouble();
+					boolean create_edge;
+					if(dice <= (1-p)) {//with probability 1-p return the real value
+						create_edge = adjacency_matrix_line[target_node];
+					}else {//else flip the bit
+						create_edge = (adjacency_matrix_line[target_node]) ? false : true;
+					}
+					if(create_edge) {
+						my_sanitized_neighbors.add(target_node);
+					}
+				}
+			}else{
+				//Partition and Shuffle the data
+				Random rand_node = new Random(node);
+				int[] my_neighbors = new int[sanitized_number_of_outgoing_egdes];
+				int[] fake_edges = new int[sanitized_number_of_outgoing_egdes];//
 				
-				int counter = 0;
-				while(true){
-					//get some random edge form this group
-					int i = rand_node.nextInt(edges_per_group);
-					int e=i*sanitized_number_of_outgoing_egdes;
-					e+=group;
-					if(!neighbor_list[node].contains(e) && my_neighbor_in_group!=e) {//can be multiple neighbors and can be invented fake edge
-						fake_edges[group] = e;
-						if(duplicate_check[e]) {
-							System.err.println("duplicate_check[e] at "+e);
-						}
-						duplicate_check[e] = true;
-						break;
+				for(int group = 0;group<sanitized_number_of_outgoing_egdes;group++) {
+					int my_neighbor_in_group = get_group_edge_or_random(group, neighbor_list[node], sanitized_number_of_outgoing_egdes, edges_per_group, rand_node);
+					my_neighbors[group] = my_neighbor_in_group;
+					if(duplicate_check[my_neighbor_in_group]) {
+						System.err.println("duplicate_check[my_neighbor_in_group] at "+my_neighbor_in_group);
 					}
-					if(counter>edges_per_group) {
-						System.err.println("k_edge_radomized_response_partitioned() Inf loop counter="+counter);
-						//TODO fall abck to rr
-						int[] group_members = new int[edges_per_group];
-						for(int gm=0;gm<group_members.length;gm++) {
-							i = gm;
-							e=i*sanitized_number_of_outgoing_egdes;
-							e+=group;
-							if(!neighbor_list[node].contains(e) && my_neighbor_in_group!=e) {//can be multiple neighbors and can be invented fake edge
-								fake_edges[group] = e;
-								if(duplicate_check[e]) {
-									System.err.println("duplicate_check[e] at "+e);
-								}
-								duplicate_check[e] = true;
-								break;
+					duplicate_check[my_neighbor_in_group] = true;
+					
+					while(true){
+						//get some random edge form this group
+						int i = rand_node.nextInt(edges_per_group);
+						int e=i*sanitized_number_of_outgoing_egdes;
+						e+=group;
+						if(my_neighbor_in_group!=e) {//return some other edge from this group. It's ok to return an existing edge.
+							fake_edges[group] = e;
+							if(duplicate_check[e]) {
+								System.err.println("duplicate_check[e] at "+e);
 							}
+							duplicate_check[e] = true;
+							break;
 						}
-						System.err.println("??? not enough fake edges ibn group using -my_neighbor_in_group");
-						fake_edges[group] = -my_neighbor_in_group;
-					}
-					counter++;
-				}
-			}
-			//Sanity check
-			for(int e : neighbor_list[node]) {
-				for(int f_e : fake_edges) {
-					if(e == f_e) {
-						System.err.println("e == f_e"+" "+e);	
 					}
 				}
-			}
-
-			Partition partition = new Partition(my_neighbors, fake_edges);
+				Partition partition = new Partition(my_neighbors, fake_edges);
+				
+				//Execute Q2
+				my_sanitized_neighbors = q_2(partition.my_neighbors, partition.fake_edges, sanitized_number_of_outgoing_egdes, epsilon_q2, rand);	
 			
-			//Execute Q2
-			ArrayList<Integer> my_sanitized_neighbors = q_2(partition.my_neighbors, partition.fake_edges, sanitized_number_of_outgoing_egdes, epsilon_q2, rand);	
-		
+			}
+			
 			sanitized_neighbor_list[node] = my_sanitized_neighbors;
 			
 			if(node%10000==0) {
@@ -553,7 +421,7 @@ public class Mechanism {
 		return new Graph(sanitized_neighbor_list, g.name+" "+name);
 	}
 	
-	private static int get_group_edge_or_random(int group, ArrayList<Integer> neighbors, int num_groups, int edges_per_group, Random rand_node) {
+	static int get_group_edge_or_random(int group, ArrayList<Integer> neighbors, int num_groups, int edges_per_group, Random rand_node) {
 		for(int e : neighbors) {
 			if(e % num_groups == group) {
 				return e;
@@ -790,7 +658,7 @@ public class Mechanism {
 		return result;
 	}
 	
-	public static final int sanitize(final double val, final double sensitivity, final double epsilon) {
+	static final int sanitize(final double val, final double sensitivity, final double epsilon) {
 		final double lambda = sensitivity/epsilon;
 		return sanitize(val, lambda);
 	}
@@ -804,7 +672,7 @@ public class Mechanism {
      * 
      * @return
      */
-    public static final int sanitize(final double val, final double lambda) {
+    static final int sanitize(final double val, final double lambda) {
         double noise = LaplaceStream.nextNumber() * lambda;
         double sanVal = val + noise;        
         //System.out.println(sanVal);
@@ -815,6 +683,187 @@ public class Mechanism {
         }
         return (int)sanVal;
     }
+    
+    private static final double sanitize_double(final double val, final double lambda) {
+        double noise = LaplaceStream.nextNumber() * lambda;
+        double sanVal = val + noise;        
+        //System.out.println(sanVal);
+        
+        return sanVal;
+    }
 
 
+	/**
+	 * top_k
+	 * @param g
+	 * @param p
+	 * @return
+	 */
+	public static Graph top_k(Graph g, final double all_epsilon, final double epsilon_q1, boolean use_seq_composition) {
+		String name = "top_k() use_seq_composition="+use_seq_composition;
+		System.out.println(name);
+		double start = System.currentTimeMillis();
+		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
+		
+		//distribute budget
+		final double count_query_epsilon = epsilon_q1;
+		final double epsilon_q2 = all_epsilon-epsilon_q1;
+		
+		@SuppressWarnings("unchecked")
+		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
+		
+		/**
+		 * Buffer for the scoring function
+		 */
+		double[] scoring_function_u = new double[g.num_vertices];
+		
+		for(int node=0;node<g.num_vertices;node++) {
+			final ArrayList<Integer> my_true_neighbors = neighbor_list[node];
+			//Execute Q1
+			int sanitized_number_of_outgoing_egdes = q_1(my_true_neighbors, count_query_senstivity, count_query_epsilon);
+			
+			//Compute the (noisy) scoring function
+			Arrays.fill(scoring_function_u, 0);
+			compute_scoring_function(scoring_function_u, my_true_neighbors);
+			add_noise_to_scoring_function(scoring_function_u, epsilon_q2, sanitized_number_of_outgoing_egdes, use_seq_composition);
+			
+			TopK col = TopK.create_With_First_K_Elements(sanitized_number_of_outgoing_egdes, scoring_function_u);
+			for(int node_id = sanitized_number_of_outgoing_egdes; node_id < g.num_vertices; node_id++) {
+				double score = scoring_function_u[node_id];
+				col.tryUpdate(node_id, score);
+			}
+			
+			ArrayList<Integer> my_sanitized_neighbors = new ArrayList<Integer>(sanitized_number_of_outgoing_egdes);
+			sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			for(int target : col.node_ids) {
+				my_sanitized_neighbors.add(target);
+			}
+			Collections.sort(my_sanitized_neighbors);
+
+			if(node%10000==0) {
+				System.out.println("node="+node);
+			}
+		}
+		Graph.stop(start, "top_k()");
+		return new Graph(sanitized_neighbor_list,g.name+" top_k() use_seq_composition="+use_seq_composition);
+	}
+
+	private static void add_noise_to_scoring_function(final double[] scoring_function_u, final double epsilon, int k, final boolean use_seq_composition) {
+		add_noise_to_scoring_function(scoring_function_u, epsilon, k, use_seq_composition, 1.0);//Sensitivity is 1
+	}
+	
+	private static void add_noise_to_scoring_function(final double[] scoring_function_u, final double epsilon, int k, final boolean use_seq_composition, final double sensitivity_u) {
+		double lambda; 
+		if(use_seq_composition) {
+			lambda = sensitivity_u*(double)k / epsilon;//distribute epsilon among k queries, i.e., respect seq composition.
+		}else{
+			lambda = sensitivity_u / epsilon;
+		}
+		for(int node = 0;node<scoring_function_u.length;node++) {
+			double org_score = scoring_function_u[node];
+			double noisy_u = sanitize_double(org_score, lambda);
+			scoring_function_u[node] = noisy_u;
+		}
+	}
+
+	private static void compute_scoring_function(double[] scoring_function_u, ArrayList<Integer> my_true_neighbors) {
+		for(int neighbor : my_true_neighbors) {
+			scoring_function_u[neighbor] = 1;
+		}
+	}
+	
+	/**
+	 * top_k
+	 * @param g
+	 * @param p
+	 * @return
+	 */
+	public static Graph educated_guess(Graph g, final double all_epsilon, final boolean non_private) {
+		String name = "educated_guess()";
+		System.out.println(name);
+		Random rand = new Random(123456);
+		double start = System.currentTimeMillis();
+		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
+		
+		//distribute budget
+		final double count_query_epsilon = all_epsilon/2;
+		final double epsilon_q2 = all_epsilon-count_query_epsilon;
+		
+		@SuppressWarnings("unchecked")
+		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
+		
+		final int[] out_degress = new int[g.num_vertices];
+		/**
+		 * Frequency of each node as target
+		 */
+		final int[] histogram   = new int[g.num_vertices];
+		
+		for(int node=0;node<g.num_vertices;node++) {//TODO locally DP?
+			final ArrayList<Integer> my_true_neighbors = neighbor_list[node];
+			for(int neighbor : my_true_neighbors) {
+				histogram[neighbor]++;
+			}
+			//Execute Q1 privately
+			out_degress[node] = (non_private) ? my_true_neighbors.size() : q_1(my_true_neighbors, count_query_senstivity, count_query_epsilon);
+		}
+		
+		//make histogram private
+		if(!non_private) {
+			double lambda = 1.0d / epsilon_q2;
+			for(int node=0;node<g.num_vertices;node++) {
+				int count = histogram[node];
+				count = sanitize(count, lambda);
+				histogram[node] = count;
+			}
+		}
+		final double[] probabilites = to_probabilities(histogram);
+		
+		//dice the edges
+		for(int node=0;node<g.num_vertices;node++) {
+			int out_degree = out_degress[node];
+			
+			ArrayList<Integer> my_sanitized_neighbors = new ArrayList<Integer>(out_degree);
+			sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			int counter = 0;
+			HashSet<Integer> edges = new HashSet<Integer>();
+			while(counter<g.num_vertices && edges.size()<out_degree) {
+				int edge = random_choice(probabilites, rand);
+				edges.add(edge);
+				if(counter == g.num_vertices-2) {
+					System.err.println("Warning educated_guess() counter == g.num_vertices-2");
+				}
+			}
+			for(int egde : edges) {
+				my_sanitized_neighbors.add(egde);
+			}
+			Collections.sort(my_sanitized_neighbors);
+		}
+		Graph.stop(start, "educated_guess()");
+		return new Graph(sanitized_neighbor_list,g.name+" educated_guess()");
+	}
+	
+	public static int random_choice(final double[] probabilities, Random rand) {
+		final double threshold = rand.nextDouble(); //Some value in [0,1]. We return the
+		double prob = 0.0d;
+		for(int i=0;i<probabilities.length;i++) {
+			double p = probabilities[i];
+			prob += p;
+			if(prob>=threshold) {
+				return i;
+			}
+		}
+		System.err.println("Should never come till here");
+		return -1;
+	}
+	public static double[] to_probabilities(int[] noissy_u) {
+		double sum = 0.0d;
+		for(double d: noissy_u) {
+			sum += (double)d;
+		}
+		double[] probabilites = new double[noissy_u.length];
+		for(int i=0;i<probabilites.length;i++) {
+			probabilites[i] = ((double)noissy_u[i]) / sum;
+		}
+		return probabilites;
+	}
 }

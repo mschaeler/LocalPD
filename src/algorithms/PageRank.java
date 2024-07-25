@@ -53,10 +53,10 @@ public class PageRank {
 		for(int node=0;node<g.num_vertices;node++) {
 			ArrayList<Integer> my_neighbors = neighbors[node];
 			double size = my_neighbors.size();
-			double page_rank = result[node];
+			double page_rank = result[node];//my page rank of the round before
 			double give_away_pr = page_rank / size;
 			for(int target_node : my_neighbors){
-				temp[target_node] = give_away_pr;
+				temp[target_node] += give_away_pr;
 			}
 		}
 		double sum_delta = sum_delta(temp, result);
