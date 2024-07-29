@@ -196,6 +196,27 @@ public class Metrics {
 		}
 		return result;
 	}
+	
+	/**
+	 * returns average page_rank delta for each sanitized_gs to original_g
+	 */
+	public static final double page_rank(final Graph g) {
+		final double[] page_rank = PageRank.run(g);
+		double avg_page_rank = avg(page_rank);
+		ResultCollector.all_page_rank.add(avg_page_rank);
+		String name = "org g";
+		double[] all_eps = {-1};
+		ResultCollector.store(name, all_eps);
+		return avg_page_rank;
+	}
+	public static final double[] page_rank(final ArrayList<Graph> all_g) {
+		final double[] all_page_rank = new double[all_g.size()];
+		for(int i=0;i<all_g.size();i++){
+			double avg_page_rank = avg(PageRank.run(all_g.get(i)));
+			all_page_rank[i] = avg_page_rank;
+		}
+		return all_page_rank;
+	}
 
 	/**
 	 * returns average proximity prestige delta for each sanitized_gs to original_g

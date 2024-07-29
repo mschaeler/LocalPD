@@ -13,7 +13,7 @@ public class PageRank {
 	private double[] result;
 	private double[] temp;
 	private double d = 0.85;
-	private int max_rounds = 20;
+	private int max_rounds = 100;
 	private double convergence_threshold = 0.01d;
 	
 	public PageRank(Graph g){
@@ -29,7 +29,10 @@ public class PageRank {
 	 * @return array of page rank value per node. Sum over all page rank value = 1.
 	 */
 	public static double[] run(Graph g) {
-		return new PageRank(g).run();
+		double start = System.currentTimeMillis();
+		double[] pr = new PageRank(g).run();
+		System.out.println("PageRank.run() "+(System.currentTimeMillis()-start)+" ms");
+		return pr;
 	}
 	
 	double[] run() {
@@ -37,7 +40,7 @@ public class PageRank {
 		Arrays.fill(result, 1.0d/(double)g.num_vertices);
 		int round = 0;
 		while(round<max_rounds) {
-			System.out.print("round "+round+" ");
+			//System.out.print("round "+round+" ");
 			double sum_delta = round();
 			if(sum_delta<convergence_threshold ) {
 				return result;
@@ -70,7 +73,7 @@ public class PageRank {
 		for(int node=0;node<g.num_vertices;node++) {
 			result[node] /= sum_pr;
 		}
-		System.out.println("sum_delta="+sum_delta+" sum_pr="+sum_pr);
+		//System.out.println("sum_delta="+sum_delta+" sum_pr="+sum_pr);
 		return sum_delta;
 	}
 

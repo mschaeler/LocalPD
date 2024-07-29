@@ -7,7 +7,7 @@ import graphs.Metrics;
 
 public class ResultCollector {
 	static ArrayList<double[]> all_metrics = new ArrayList<double[]>();
-	static ArrayList<Double> all_page_rank = new ArrayList<Double>();
+	public static ArrayList<Double> all_page_rank = new ArrayList<Double>();
 	public static ArrayList<double[]> all_proximity_prestige = new ArrayList<double[]>();
 	
 	

@@ -38,8 +38,7 @@ public class DataLoader {
 		}else if(id==ENRON_MULTI_EDGE) {
 			return get_enron_graph();
 		}else if(id==ENRON_SINGLE_EDGE) {
-			Graph g = DataLoader.get_enron_graph();
-			g = Graph.dedup_edges(g);
+			Graph g = DataLoader.get_enron_single_edge_graph();
 			return g;
 		}else if(id==CONGRESS_TWITTER) {
 			return get_congress_twitter_graph();
@@ -298,15 +297,12 @@ public class DataLoader {
 		}
 	}
 	
-	private static String congress_twitter = "./data/congress.edgelist";
-	
-	static Graph get_congress_twitter_graph() {
+	static Graph get_graph_from_edge_list(String file, int num_node) {
 		final int source_offset = 0;
 		final int target_offset = 1;
-		final int num_node = 475;//According to https://snap.stanford.edu/data/congress-twitter.html
-		Graph g = new Graph(num_node, "congress");
+		Graph g = new Graph(num_node, file);
 		
-		File f = new File(congress_twitter);
+		File f = new File(file);
 		if(f.exists()) {
 			try(BufferedReader br = new BufferedReader(new FileReader(f))){
 				String line;
@@ -337,5 +333,15 @@ public class DataLoader {
 			System.err.println(f+" does not exist");
 			return null;
 		}
+	}
+	private static String congress_twitter = "./data/congress.edgelist";
+	static Graph get_congress_twitter_graph() {
+		final int num_node = 475;//According to https://snap.stanford.edu/data/congress-twitter.html
+		return get_graph_from_edge_list(congress_twitter, num_node);
+	}
+	private static String ennon_single_edge = "./data/dp_enron_dedup.edgelist";
+	static Graph get_enron_single_edge_graph() {
+		final int num_node = 75557;
+		return get_graph_from_edge_list(ennon_single_edge, num_node);
 	}
 }

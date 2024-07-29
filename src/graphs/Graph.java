@@ -1,5 +1,7 @@
 package graphs;
 
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 
@@ -8,7 +10,7 @@ public class Graph {
 	final String name;
 	
 	public int num_vertices;
-	private final ArrayList<Egde> edges = new ArrayList<Graph.Egde>();
+	private final ArrayList<Edge> edges = new ArrayList<Graph.Edge>();
 	
 	public Graph(int num_vertices, String name) {
 		this.num_vertices = num_vertices;//They exist only virtually
@@ -26,7 +28,7 @@ public class Graph {
 		for(int l=0;l<num_lines;l++) {
 			for(int c=0;c<num_columns;c++) {
 				if(adjacency_matrix[l][c]) {//there is an edge
-					new Egde(l, c);
+					new Edge(l, c);
 				}
 			}
 		}
@@ -36,17 +38,17 @@ public class Graph {
 		this(neighbor_list.length, name);
 		for(int node=0;node<neighbor_list.length;node++) {
 			for(int target : neighbor_list[node]) {
-				new Egde(node,target);
+				new Edge(node,target);
 			}
 		}
 	}
 
-	class Egde{
+	class Edge{
 		//final int id;
 		final int from;
 		final int to;
 		
-		Egde(int from, int to){
+		Edge(int from, int to){
 			this.from = from;
 			this.to   = to;
 			//this.id = get_next_edge_id();
@@ -73,7 +75,7 @@ public class Graph {
 	public int[][] get_edges_for_sanitation(){
 		int[][] e = new int[edges.size()][2];
 		for(int i=0;i<edges.size();i++) {
-			Egde my_edge = edges.get(i);
+			Edge my_edge = edges.get(i);
 			if(my_edge.from>this.num_vertices) {
 				System.err.println("get_edges_for_sanitation");
 			}
@@ -95,7 +97,7 @@ public class Graph {
 		for(int i=0;i<this.num_vertices;i++) {
 			edge_list[i] = new ArrayList<Integer>();
 		}
-		for(Egde e : edges) {
+		for(Edge e : edges) {
 			if(edge_list[e.from].contains(e.to)) {
 				System.err.println("get_neighbors(): Duplicate edge");
 			}
@@ -110,7 +112,7 @@ public class Graph {
 		for(int i=0;i<this.num_vertices;i++) {
 			edge_list[i] = new ArrayList<Integer>();
 		}
-		for(Egde e : edges) {
+		for(Edge e : edges) {
 			if(edge_list[e.to].contains(e.from)) {
 				System.err.println("get_neighbors(): Duplicate edge");
 			}
@@ -121,7 +123,7 @@ public class Graph {
 	
 	public boolean[][] get_adjancency_matrix_as_bit_vector(){
 		boolean[][] neighbors = new boolean[this.num_vertices][this.num_vertices];
-		for(Egde e : edges) {
+		for(Edge e : edges) {
 			if(neighbors[e.from][e.to] == true) {
 				System.err.println("get_adjancency_matrix_as_bit_vector(): Duplicate edge "+e);
 			}
@@ -141,7 +143,7 @@ public class Graph {
 	}
 
 	void add_edge(int from, int to) {
-		new Egde(from, to);
+		new Edge(from, to);
 	}
 	
 	public String toString() {
@@ -151,7 +153,7 @@ public class Graph {
 		
 		//String ret = "Graph with "+this.num_vertices+" vertices and "+this.edges.size()+" edges";
 		int counter = 0;
-		for(Egde e : this.edges) {
+		for(Edge e : this.edges) {
 			if(counter > 10) break;
 			sb.append(" "+e);
 			counter++;
@@ -172,7 +174,7 @@ public class Graph {
 		Graph output = new Graph(input.num_vertices, input.name+"_dedup");//creates graph with not edges
 		HashSet<ArrayList<Integer>> unique_edges = new HashSet<ArrayList<Integer>>(input.num_vertices);
 		int counter = 0;
-		for(Egde e : input.edges) {
+		for(Edge e : input.edges) {
 			unique_edges.add(e.to_list());
 			if(counter++%100000==0) {
 				System.out.println(counter);
@@ -187,5 +189,27 @@ public class Graph {
 		stop(start, "dedup_edges(Graph g) Ouput:");
 		System.out.println(output);
 		return output;
+	}
+	
+	public String to_edge_list() {
+		return to_edge_list(" ");//Default delimiter is a space
+	}
+	public String to_edge_list(String delimiter) {
+		StringBuffer sb = new StringBuffer(10000);
+		for(Edge e : edges) {
+			sb.append(e.from+delimiter+e.to+"\n");
+		}
+		return sb.toString();
+	}
+	public void to_file(String edge_list) {
+		try (PrintWriter out = new PrintWriter("./data/dp_"+name+".edgelist")) {
+		    out.println(edge_list);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+	public void to_file() {
+		String edge_list = to_edge_list();
+		to_file(edge_list);
 	}
 }

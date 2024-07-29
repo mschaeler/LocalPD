@@ -117,9 +117,9 @@ public class TestGraphs {
 		}else if(mechanism==K_EDGE_PART_RR){
 			san_g = Mechanism.k_edge_radomized_response_partitioned(g, epsilon, e_q1, true);
 		}else if(mechanism==TOP_K){
-			san_g = Mechanism.top_k(g, epsilon, e_q1, false);
+			san_g = Mechanism.top_k(g, epsilon, e_q1, true);
 		}else if(mechanism==GUESS){
-			san_g = Mechanism.educated_guess(g, epsilon, true);
+			san_g = Mechanism.educated_guess(g, epsilon, false);
 		}else{
 			System.err.println("Unknown mechanism "+mechanism);
 			san_g = null;
@@ -182,12 +182,14 @@ public class TestGraphs {
 
 	public static void main(String[] args) {
 		//Config.USE_RESULT_STATISTICS = true;
-		Config.USE_RESULT_PROXIMITY_PRESTIGE = true;
-		Graph g = DataLoader.get_graph(DataLoader.ADVOGATO);
-		//int[] all_mechanisms = {K_EDGE_NON_PRIVATE, K_EDGE_SEQ, K_EDGE_SEQ_RR, K_EDGE_PART, K_EDGE_PART_RR};
-		int[] all_mechanisms = {GUESS};
+		Config.USE_RESULT_PAGE_RANK = true;
+		Graph g = DataLoader.get_graph(DataLoader.ENRON_SINGLE_EDGE);
+		//g.to_file();
+		int[] all_mechanisms = {RANDOM_RESPONSE,K_EDGE_NON_PRIVATE, K_EDGE_SEQ, K_EDGE_SEQ_RR, K_EDGE_PART, K_EDGE_PART_RR, TOP_K, GUESS};
+		//int[] all_mechanisms = {TOP_K};
 		
 		//Metrics.proximity_prestige(g);
+		Metrics.page_rank(g);
 		run(g, all_mechanisms);
 		//run_randomized_response(g);
 		//run_k_edge_non_private_grouping(g);

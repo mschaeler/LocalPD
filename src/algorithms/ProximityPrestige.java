@@ -120,12 +120,7 @@ public class ProximityPrestige {
 	
 	InfDom[] run() {
 		get_influence_domain();
-		
-		InfDom[] result = new InfDom[g.num_vertices];
-		for(int node=0;node<g.num_vertices;node++) {
-			result[node] = influence_domains[node];//TODO why keeping it like this?
-		}
-		return result;
+		return influence_domains;
 	}
 
 	public class InfDom{
