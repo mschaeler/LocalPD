@@ -1,6 +1,8 @@
 package graphs;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -203,6 +205,18 @@ public class Graph {
 	}
 	public void to_file(String edge_list) {
 		try (PrintWriter out = new PrintWriter("./data/dp_"+name+".edgelist")) {
+		    out.println(edge_list);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+	public void to_file(String edge_list, String approach_name, String graph_name, double epsilon, int repition) {
+		String path = "./data/synthetic/"+graph_name;
+		File folder = new File(path);
+		if(!folder.exists()) {
+			folder.mkdirs();
+		}
+		try (PrintWriter out = new PrintWriter(path+"/"+approach_name+"-"+epsilon+"-"+repition+".edgelist")) {
 		    out.println(edge_list);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();

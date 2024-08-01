@@ -3,6 +3,10 @@ package algorithms;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import graphs.Graph;
 
@@ -21,11 +25,30 @@ public class ProximityPrestige {
 	void get_influence_domain(){
 		double start = System.currentTimeMillis();
 		System.out.print("get_influence_domain() ");
+		ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+		
 		for(int node=0;node<g.num_vertices;node++) {
+			final int node_id = node;
 			//influence_domains[node] = new InfDom(node, get_influence_domain(node));
-			influence_domains[node] = new InfDom(get_influence_domain_v02(node), node);
+			//influence_domains[node] = new InfDom(get_influence_domain_v02(node), node);
+			CompletableFuture.runAsync(() -> {
+	            wrapper(node_id);
+	        }, executorService);
 		}
+		executorService.shutdown();
+	    while(!executorService.isTerminated()) {
+	    	try {
+				//TimeUnit.MILLISECONDS.sleep(500);//Wait until every task terminated
+	    		executorService.awaitTermination(800, TimeUnit.MILLISECONDS);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+	    }
 		System.out.println("[Done] in "+(System.currentTimeMillis()-start)+" ms");
+	}
+	
+	void wrapper(final int node){
+		influence_domains[node] = new InfDom(get_influence_domain_v02(node), node);
 	}
 	
 	ArrayList<BitSet> get_influence_domain_v02(int node){

@@ -18,7 +18,7 @@ public class ResultCollector {
 	}
 	public static void collect(Graph g, ArrayList<Graph> all_san_g){
 		if(Config.USE_RESULT_STATISTICS) {
-			double[] metrics = Metrics.statistics(g, all_san_g);
+			double[] metrics = Metrics.avg_edge_edit_dist(g, all_san_g);
 			all_metrics.add(metrics);	
 		}
 		if(Config.USE_RESULT_PAGE_RANK) {

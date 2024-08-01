@@ -5,11 +5,18 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class DataLoader {
 	private static String data_file = "./data/enron-mysqldump.sql";
@@ -42,6 +49,53 @@ public class DataLoader {
 			return g;
 		}else if(id==CONGRESS_TWITTER) {
 			return get_congress_twitter_graph();
+		}else{
+			System.err.println("get_graph("+id+") Unkown id");
+			return null;
+		}
+	}
+	
+	public static String get_synthetic_path(String graph_name) {
+		return "./data/synthetic/"+graph_name;
+	}
+	
+	public static ArrayList<MaterializedGraphs> get_sanitized_graphs(Integer id){
+		String graph_name = get_graph_name(id);
+		String path = get_synthetic_path(graph_name);
+		Set<String> all_files = null;
+		try {
+			all_files = listFilesUsingFilesList(path);
+			ArrayList<MaterializedGraphs> mg = new ArrayList<MaterializedGraphs>(all_files.size());
+			for(String s : all_files) {
+				mg.add(new MaterializedGraphs(s, graph_name));
+			}
+			Collections.sort(mg);
+			return mg;
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	public static Set<String> listFilesUsingFilesList(String dir) throws IOException {
+	    try (Stream<Path> stream = Files.list(Paths.get(dir))) {
+	        return stream
+	          .filter(file -> !Files.isDirectory(file))
+	          .map(Path::getFileName)
+	          .map(Path::toString)
+	          .collect(Collectors.toSet());
+	    }
+	}
+	
+	public static String get_graph_name(Integer id){
+		if(id==ADVOGATO) {
+			return "ADVOGATO";
+		}else if(id==ENRON_MULTI_EDGE) {
+			return "ENRON_MULTI_EDGE".toLowerCase();
+		}else if(id==ENRON_SINGLE_EDGE) {
+			return "ENRON_SINGLE_EDGE".toLowerCase();
+		}else if(id==CONGRESS_TWITTER) {
+			return "CONGRESS_TWITTER".toLowerCase();
 		}else{
 			System.err.println("get_graph("+id+") Unkown id");
 			return null;
@@ -308,17 +362,21 @@ public class DataLoader {
 				String line;
 				
 				while((line = br.readLine()) != null) {
-					String tokens[] = line.split(" ");
-					int source = Integer.parseInt(tokens[source_offset]);
-					int target = Integer.parseInt(tokens[target_offset]);
-					if(source<num_node && source>=0) {
-						if(target<num_node && target>=0) {
-							g.add_edge(source, target);
+					try {
+						String tokens[] = line.split(" ");
+						int source = Integer.parseInt(tokens[source_offset]);
+						int target = Integer.parseInt(tokens[target_offset]);
+						if(source<num_node && source>=0) {
+							if(target<num_node && target>=0) {
+								g.add_edge(source, target);
+							}else{
+								System.err.println("target<num_node && target>=0");
+							}
 						}else{
-							System.err.println("target<num_node && target>=0");
+							System.err.println("source<num_node && source>=0");
 						}
-					}else{
-						System.err.println("source<num_node && source>=0");
+					} catch (Exception e) {
+						// TODO: handle exception
 					}
 				}
 			} catch (FileNotFoundException e) {
@@ -343,5 +401,28 @@ public class DataLoader {
 	static Graph get_enron_single_edge_graph() {
 		final int num_node = 75557;
 		return get_graph_from_edge_list(ennon_single_edge, num_node);
+	}
+	
+	public static Graph load(MaterializedGraphs mg) {
+		int num_node = -1;
+		if(mg.graph_name.equals(get_graph_name(0))) {
+			num_node = 6541;//Advogato
+		}else if(mg.graph_name.equals(get_graph_name(2))) {
+			num_node = 75557;//Enron
+		}else if(mg.graph_name.equals(get_graph_name(3))) {
+			num_node = 475;//congress_twitter According to https://snap.stanford.edu/data/congress-twitter.html
+		}else{
+			
+		}
+		String path = get_synthetic_path(mg.graph_name)+"/"+mg.path;
+		return get_graph_from_edge_list(path, num_node);
+	}
+
+	public static ArrayList<Graph> get_sanitized_graphs(ArrayList<MaterializedGraphs> mg_s) {
+		ArrayList<Graph> ret = new ArrayList<Graph>(mg_s.size());
+		for(MaterializedGraphs mg : mg_s) {
+			ret.add(load(mg));
+		}
+		return ret;
 	}
 }

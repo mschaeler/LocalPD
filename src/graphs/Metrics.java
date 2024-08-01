@@ -2,6 +2,9 @@ package graphs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map.Entry;
 
 import algorithms.PageRank;
 import algorithms.ProximityPrestige;
@@ -34,7 +37,7 @@ public class Metrics {
 		return s;
 	}
 
-	public static final double[] statistics(Graph original_g, ArrayList<Graph> sanitized_gs) {
+	public static final double[] avg_edge_edit_dist(Graph original_g, ArrayList<Graph> sanitized_gs) {
 		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
 		ArrayList<double[]> all_sums = new ArrayList<double[]>();
 		
@@ -42,7 +45,7 @@ public class Metrics {
 			double[] sum = new double[4];
 			Graph g = sanitized_gs.get(i);
 			final boolean[][] to_ceck = g.get_adjancency_matrix_as_bit_vector();
-			final int[][] result = node_edit_dist(ground_truth, to_ceck);
+			final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 			
 			for(int[] r : result) {
 				sum[correct_edge]+= r[correct_edge];
@@ -76,7 +79,7 @@ public class Metrics {
 	static final double mae(Graph original_g, Graph sanitized_g) {
 		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
 		final boolean[][] to_ceck = sanitized_g.get_adjancency_matrix_as_bit_vector();
-		final int[][] result = node_edit_dist(ground_truth, to_ceck);
+		final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 		
 		double sum = 0;
 		for(int[] r : result) {
@@ -96,7 +99,7 @@ public class Metrics {
 		for(int i=0;i<sanitized_gs.size();i++) {
 			Graph g = sanitized_gs.get(i);
 			final boolean[][] to_ceck = g.get_adjancency_matrix_as_bit_vector();
-			final int[][] result = node_edit_dist(ground_truth, to_ceck);
+			final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 			
 			double sum = 0;
 			for(int[] r : result) {
@@ -111,8 +114,13 @@ public class Metrics {
 		return all_mae;
 	}
 	
-	
-	private static int[][] node_edit_dist(final boolean[][] ground_truth, final boolean[][] to_ceck) {
+	/**
+	 * Computes for each vertice the number of correct, missing, fake, and correct-non-edges. I.e., the it return an array[|V|][4]
+	 * @param ground_truth
+	 * @param to_ceck
+	 * @return
+	 */
+	private static int[][] edge_edit_dist(final boolean[][] ground_truth, final boolean[][] to_ceck) {
 		if(ground_truth.length!=to_ceck.length) {
 			System.err.println("node_edit_dist() ground_truth.length!=to_ceck.length");
 		}
@@ -137,7 +145,7 @@ public class Metrics {
 		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
 		ArrayList<Integer>[] neighbors = original_g.get_neighbors();
 		final boolean[][] to_ceck = sanitized_g.get_adjancency_matrix_as_bit_vector();
-		final int[][] result = node_edit_dist(ground_truth, to_ceck);
+		final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 		
 		double sum = 0;
 		for(int node=0;node<original_g.num_vertices;node++) {
@@ -160,7 +168,7 @@ public class Metrics {
 		for(int i=0;i<sanitized_gs.size();i++) {
 			Graph g = sanitized_gs.get(i);
 			final boolean[][] to_ceck = g.get_adjancency_matrix_as_bit_vector();
-			final int[][] result = node_edit_dist(ground_truth, to_ceck);
+			final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 			
 			double sum = 0;
 			for(int node=0;node<original_g.num_vertices;node++) {
@@ -344,5 +352,145 @@ public class Metrics {
 			sum+=d;
 		}
 		return sum;
+	}
+	
+	
+	public static double[] count_triangles(Graph org_g, ArrayList<Graph> private_gs) {
+		System.out.println("count_triangles(Graph, ArrayList<Graph>)");
+		double start = System.currentTimeMillis();
+		final double[] count = new double[private_gs.size()];
+		final long true_count_triangles = count_triangles(org_g);
+		
+		for(int i=0;i<private_gs.size();i++) {
+			count[i] = count_triangles(private_gs.get(i));
+			//deltas[i] = Math.abs(true_count_triangles-my_count);
+		}
+		double avg = avg(count);
+		double[] ret = {true_count_triangles, avg};
+		System.out.println("count_triangles(Graph, ArrayList<Graph>) [Done] in "+(System.currentTimeMillis()-start)+" ms");
+		return ret;
+	}
+	
+	
+	//FIXME
+	public static double[] count_triangle_delta(Graph g, ArrayList<Graph> private_gs) {
+		//System.out.println("count_triangles(Graph)");
+		double start = System.currentTimeMillis();
+
+		final double[] count = new double[private_gs.size()];
+		ArrayList<int[]> all_org_triangles = get_triangles(g);
+		for(int i=0;i<private_gs.size();i++) {
+			count[i] = count_triangle_delta(all_org_triangles, private_gs.get(i));
+		}
+		double avg = avg(count);
+		double[] ret = {all_org_triangles.size(), avg};
+		System.out.println("count_triangle_delta(Graph, ArrayList<int[]>) [Done] in " + (System.currentTimeMillis() - start) + " ms");
+		return ret;
+	}
+	
+	private static long count_triangle_delta(ArrayList<int[]> all_org_triangles, Graph g) {//XXX Java...
+		//System.out.println("count_triangles(Graph)");
+		double start = System.currentTimeMillis();
+		/**
+		 * Adjacency matrix of g
+		 */
+		final boolean[][] am = g.get_adjancency_matrix_as_bit_vector();
+		long count_triangles = 0;
+		for(int[] org_triangle : all_org_triangles) {
+			final int i = org_triangle[0];
+			final int j = org_triangle[1];
+			final int k = org_triangle[2];
+			if(am[i][j] && am[j][k] && am[k][i]) {
+				count_triangles++;
+			}
+		}
+		
+		System.out.println("count_triangle_delta(Graph, ArrayList<int[]>) [Done] in " + (System.currentTimeMillis() - start) + " ms");
+		return count_triangles;
+	}
+	
+	public static ArrayList<int[]> get_triangles(Graph g) {
+		//System.out.println("count_triangles(Graph)");
+		double start = System.currentTimeMillis();
+		HashMap<Integer, ArrayList<int[]>> all_triangles = new HashMap<Integer, ArrayList<int[]>>();
+		/**
+		 * Adjacency matrix of g
+		 */
+		final boolean[][] am = g.get_adjancency_matrix_as_bit_vector();
+		final int V = g.num_vertices;
+		for (int i = 0; i < V; i++) {
+			for (int j = 0; j < V; j++) {
+				if(am[i][j]) {
+					for (int k = 0; k < V; k++) {
+						if (am[j][k] && am[k][i]) {// This is a triangle
+							int[] triangle = {i,j,k};
+							Arrays.sort(triangle);
+							insert_if_not_contained(all_triangles, triangle);
+						}
+					}
+				}
+			}
+		}
+
+		ArrayList<int[]> result = new ArrayList<int[]>();
+		for(Entry<Integer, ArrayList<int[]>> hash_bucket : all_triangles.entrySet()) {
+			for(int[] triangle : hash_bucket.getValue()) {
+				result.add(triangle);
+			}
+		}
+		
+		System.out.println("get_triangles(Graph) [Done] in " + (System.currentTimeMillis() - start) + " ms");
+		return result;
+	}
+	
+	/**
+	 * The problem is, we find each triangle three times. 
+	 * So we must efficiently check, whether we got this one already. We do this by hashing the triangles.
+	 * 
+	 * @param all_triangles
+	 * @param triangle
+	 * @return
+	 */
+	private static boolean insert_if_not_contained(HashMap<Integer, ArrayList<int[]>> all_triangles, int[] triangle) {
+		int hash_code = triangle[0] +triangle[1] +triangle[2];
+		ArrayList<int[]> my_list = all_triangles.get(hash_code);
+		if(my_list == null) {
+			my_list = new ArrayList<int[]>();
+			all_triangles.put(hash_code, my_list);
+		}
+		for(int[] other_triangle : my_list) {
+			if(other_triangle[0] == triangle[0] && other_triangle[1] == triangle[1] && other_triangle[2] == triangle[2]) {
+				return false;
+			}
+		}
+		my_list.add(triangle);
+		return true;
+	}
+
+	public static long count_triangles(Graph g) {
+		//System.out.println("count_triangles(Graph)");
+		double start = System.currentTimeMillis();
+		/**
+		 * Adjacency matrix of g
+		 */
+		final boolean[][] am = g.get_adjancency_matrix_as_bit_vector();
+		long count_triangles = 0;
+		final int V = g.num_vertices;
+		for (int i = 0; i < V; i++) {
+			for (int j = 0; j < V; j++) {
+				if(am[i][j]) {
+					for (int k = 0; k < V; k++) {
+						if (am[j][k] && am[k][i]) {// This is a triangle
+							count_triangles++;
+						}
+					}
+				}
+			}
+		}
+
+		// We find every triangle 3 times in directed graph (6 times in an undirected)
+		count_triangles /= 3;
+		System.out.println("count_triangles(Graph) [Done] in " + (System.currentTimeMillis() - start) + " ms");
+		return count_triangles;
 	}
 }

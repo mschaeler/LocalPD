@@ -842,7 +842,7 @@ public class Mechanism {
 		return new Graph(sanitized_neighbor_list,g.name+" educated_guess()");
 	}
 	
-	public static int random_choice(final double[] probabilities, Random rand) {
+	static int random_choice(final double[] probabilities, Random rand) {
 		final double threshold = rand.nextDouble(); //Some value in [0,1]. We return the
 		double prob = 0.0d;
 		for(int i=0;i<probabilities.length;i++) {
