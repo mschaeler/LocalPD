@@ -7,8 +7,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Random;
+import java.util.stream.IntStream;
 
 import algorithms.LaplaceStream;
+import misc.KMedoids;
+import misc.KMedoids.Clustering;
 import misc.TopK;
 import results.TheoreticalAnalysis;
 
@@ -670,7 +673,7 @@ public class Mechanism {
      * @param val original 1-dimensional query result at time t
      * @param lambda noise scale to add to each query dimension
      * 
-     * @return
+     * @return non-negative integer
      */
     static final int sanitize(final double val, final double lambda) {
         double noise = LaplaceStream.nextNumber() * lambda;
@@ -865,5 +868,221 @@ public class Mechanism {
 			probabilites[i] = ((double)noissy_u[i]) / sum;
 		}
 		return probabilites;
+	}
+	
+	/**
+	 * Generating Synthetic Decentralized Social Graphs with Local Differential Privacy, CCS'17
+	 * 
+	 * @param g - original graph
+	 * @param epsilon
+	 * @param epsilon_1
+	 * @return
+	 */
+	public static Graph LDPGen(final Graph g, final double epsilon) {
+		String name = "LDPGen";
+		System.out.println(name +" e="+ epsilon);
+		double start = System.currentTimeMillis();
+		
+		//XXX According to Sec 4.7
+		final double epsilon_1 = epsilon/2.0d; 
+		final int k_0 = 2;
+		
+		//Phase 1 - Randomly assign vertices to k partitions
+		/**
+		 * Xi_0 vertex -> partition
+		 */
+		HashMap<Integer, Integer> partition_assigenments = new HashMap<Integer, Integer>(g.num_vertices);
+		for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+			partition_assigenments.put(vertex, vertex%k_0);
+		}
+		
+		//Phase 1 - Compute degree vector
+		ArrayList<Integer>[] N = g.get_neighbors();
+		double lambda = 1.0d / epsilon_1;
+		/**
+		 * Noisy out degree estimation for each vertex
+		 */
+		final int[] all_eta = new int[g.num_vertices];
+		/**
+		 * Noisy out degree estimation for each vertex to each partition
+		 * usage all_delta[vertex][partition]
+		 */
+		final int[][] all_delta = new int[g.num_vertices][];
+		for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+			ArrayList<Integer> my_neighbors = N[vertex];
+			/**
+			 * Noisy degree vector of vertex: \delta^u in the paper. Basically a histogram.
+			 */
+			final int[] delta_u = new int[k_0];
+			for(int target : my_neighbors) {
+				int target_partition = partition_assigenments.get(target);
+				delta_u[target_partition]++;
+			}
+			for(int bin=0;bin<k_0;bin++) {
+				int san_bin_value = sanitize(delta_u[bin], lambda);
+				delta_u[bin] = san_bin_value;
+			}
+			final int eta = IntStream.of(delta_u).sum();//XXX Equation 1, page 429. Why does that work?
+			all_delta[vertex] = delta_u;
+			all_eta[vertex] = eta;
+		}
+		
+		//Phase 1 - estimate optimal number of partitions k_1
+		final int max_degree = max(all_eta);
+		/**
+		 * H[degree] -> Pr(degree)
+		 * sum over all degrees = 1.0
+		 */
+		double[] H = new double[max_degree+1];
+		for(int degree : all_eta) {
+			H[degree]++;
+		}
+		for(int bin=0;bin<=max_degree;bin++) {//make H the probability histogram
+			H[bin] /= (double)g.num_vertices;
+		}
+		double sum = 0.0d;
+		int k_1 = k_0;//XXX Equation 20 wants to estimate k_1 but contains k_1 on the left hand side, guess its an error using k_0 instead.
+		for(int bin=0;bin<=max_degree;bin++) {//make H the probability histogram
+			sum += H[bin] * (double)k_1*0.5*(double)bin;
+		}
+		k_1 = (int) Math.ceil(Math.min(sum, 50));//XXX Papers assumes not more than 50 partitions for Eq. 15
+		
+		Clustering xi_1 = new KMedoids(all_delta, k_1).run();
+		HashMap<Integer, Integer> xi_1_hashed = xi_1.to_hash_map();
+		
+		Graph.stop(start, "Phase 1 k_1="+k_1);
+		//System.out.println(xi_1);
+		
+		//Phase 2 - Compute noisy degree vector to each partition according to xi_1
+		double epsilon_2 = epsilon - epsilon_1;
+		lambda = 1.0d / epsilon_2;
+		/**
+		 * \delta^1_u
+		 */
+		final int[][] all_degree_vector_xi_1 = new int[g.num_vertices][];
+		for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+			ArrayList<Integer> my_neighbors = N[vertex];
+			/**
+			 * \delta^u in the paper. Basically a histogram.
+			 */
+			final int[] my_degree_vector = new int[k_1];
+			for(int target : my_neighbors) {
+				int target_partition = xi_1_hashed.get(target);//This is the difference to Phase 1
+				my_degree_vector[target_partition]++;
+			}
+			for(int bin=0;bin<k_1;bin++) {
+				int san_bin_value = sanitize(my_degree_vector[bin], lambda);
+				my_degree_vector[bin] = san_bin_value;
+			}
+			all_degree_vector_xi_1[vertex] = my_degree_vector;
+			final int noisy_degree_estimator_eta = IntStream.of(my_degree_vector).sum();//Equation 1, page 429
+			all_eta[vertex] = noisy_degree_estimator_eta;
+		}
+		//Phase 2 - Sec 4.4 Cluster again using the newly computed degree estimation
+		Clustering xi_2 = new KMedoids(all_degree_vector_xi_1, k_1).run();
+		
+		//Phase 2 - Sec 4.4 estimate degree vectors for xi_2 based on noisy degree vector of xi_1
+		double[][] final_degree_estimations = new double[g.num_vertices][];
+		for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+			final int[] delta_xi_1 = all_degree_vector_xi_1[vertex]; 
+			double[] my_degree_estimation = new double[k_1];
+			for(int i = 0; i < k_1; i++) {//Over all clusters
+				ArrayList<Integer> U_2_i = xi_2.getCluster(i);//U^2_i in the paper
+				double estimation = estimate(vertex, U_2_i, xi_1.ALL_CLUSTERS, delta_xi_1);
+				my_degree_estimation[i] = estimation;
+			}
+			final_degree_estimations[vertex] = my_degree_estimation;
+		}
+		
+		Graph.stop(start, "Phase 2");
+		
+		//Phase 3 - generate edges
+		Graph san_g = new Graph(g.num_vertices, g.name+"_"+name);
+		Random rand = new Random(1234567);
+
+		double[] denom_2_all_j = new double[k_1];
+		for(double[] delta_v : final_degree_estimations) {//v \in G
+			add(denom_2_all_j, delta_v);
+		}
+		//It is a bid hard to understand in the paper, but many infos required to compute the probability are partition depended, only.
+		for(int i = 0; i < k_1; i++) {//For each partition i
+			double[] denom_1_all_j = new double[k_1];
+			final ArrayList<Integer> U_i = xi_2.getCluster(i);
+			for(int u : U_i){
+				add(denom_1_all_j, final_degree_estimations[u]);
+			}
+			for(int u : U_i) {//For each Node u in U_i
+				final double[] delta_u = final_degree_estimations[u];//This is the node-specific part required to compute the probability
+
+				for(int j = 0; j < k_1; j++) {
+					final ArrayList<Integer> U_j = xi_2.getCluster(j);
+					final double denom = denom_1_all_j[j] + denom_2_all_j[j];
+					final double const_nominator = denom_2_all_j[j]/(double)U_j.size();
+					//compute probability of an edge to a node in this partition
+					double p = delta_u[j]*const_nominator/denom;
+					if(p>1.0) {
+						System.err.println("p>1.0 p="+p);
+						p=1.0d;
+					}
+					
+					for(int v : U_j) {
+						double dice = rand.nextDouble();
+						if(dice<p) {
+							san_g.add_edge(u, v);
+						}
+					}				
+				}
+			}
+		}
+		Graph.stop(start, name);
+		return san_g;
+	}
+
+	private static void add(final double[] sum, final double[] add_me) {
+		if(sum.length!=add_me.length) {
+			System.err.println("sum.length!=add_me.length");
+		}
+		
+		for(int i=0;i<sum.length;i++) {
+			sum[i] +=  add_me[i];
+		}
+	}
+	
+	private static final int max(int[] arr) {
+		int max_value = Integer.MIN_VALUE;
+		for(int v : arr) {
+			if(v>max_value) {
+				max_value = v;  
+			}
+		}
+		return max_value;
+	}
+	
+	/**
+	 * Compute the estimated degree vector of some vertex according to Sec 4.4
+	 * @param vertex - u in the paper
+	 * @param u_2_i - U^2_i \in \xi_2
+	 * @param u_1_all - grouping of \xi_1 in k_1 clusters
+	 * @param delta \delta^u from xi_1 - my old degree estimation from \xi_1 
+	 * @return
+	 */
+	private static double estimate(int vertex, ArrayList<Integer> u_2_i, ArrayList<Integer>[] u_1_all, final int[] delta) {
+		double sum = 0.0d;
+		for(int j = 0;j<u_1_all.length;j++) {//cluster = j in the paper
+			ArrayList<Integer> u_1_j = u_1_all[j];//U^1_j in the paper
+			HashSet<Integer> intersection = new HashSet<Integer>();
+			intersection.addAll(u_2_i);
+			int count = 0;
+			for(int e : u_1_j) {
+				if(intersection.contains(e)) {
+					count++;
+				}
+			}
+			double temp = count;
+			temp /= (double) u_1_j.size();
+			temp *= (double) delta[j];//should be \delta^u_j, but is \delta_j in the paper
+			sum+= temp;
+		}
+		return sum;
 	}
 }

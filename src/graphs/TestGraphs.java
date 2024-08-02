@@ -101,6 +101,7 @@ public class TestGraphs {
 	static final int K_EDGE_PART_RR 	= 5;
 	static final int TOP_K			 	= 6;
 	static final int GUESS			 	= 7;
+	static final int LDP_GEN				= 8;
 
 	static double e_q1 = 1.0;
 	
@@ -122,6 +123,8 @@ public class TestGraphs {
 			san_g = Mechanism.top_k(g, epsilon, e_q1, true);
 		}else if(mechanism==GUESS){
 			san_g = Mechanism.educated_guess(g, epsilon, false);
+		}else if(mechanism==LDP_GEN){
+			san_g = Mechanism.LDPGen(g, epsilon);
 		}else{
 			System.err.println("Unknown mechanism "+mechanism);
 			san_g = null;
@@ -176,6 +179,8 @@ public class TestGraphs {
 			return "TOP_K";
 		}else if(mechanism==GUESS){
 			return "GUESS";
+		}else if(mechanism==LDP_GEN){
+			return "LDP_GEN";
 		}else{
 			System.err.println("Unknown mechanism "+mechanism);
 			return null;
@@ -296,14 +301,15 @@ public class TestGraphs {
 
 	public static void main(String[] args) {
 		{
-			int[] graphs = {DataLoader.ENRON_SINGLE_EDGE};
-			int[] mechanism = {K_EDGE_NON_PRIVATE, K_EDGE_SEQ_RR, K_EDGE_PART_RR, TOP_K, GUESS, RANDOM_RESPONSE};
+			int[] graphs = {DataLoader.CONGRESS_TWITTER};
+			//int[] mechanism = {K_EDGE_NON_PRIVATE, K_EDGE_SEQ_RR, K_EDGE_PART_RR, TOP_K, GUESS, RANDOM_RESPONSE};
+			int[] mechanism = {LDP_GEN};
 			int num_repitions = 10;
 			double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-			//matrialize_private_graphs(graphs, mechanism, num_repitions, all_eps);	
+			matrialize_private_graphs(graphs, mechanism, num_repitions, all_eps);	
 		}
-		//String[] all_mechanisms = {name(GUESS)};
-		String[] all_mechanisms = {name(K_EDGE_NON_PRIVATE), name(K_EDGE_SEQ_RR), name(K_EDGE_PART_RR), name(TOP_K), name(GUESS), name(RANDOM_RESPONSE)};
+		String[] all_mechanisms = {name(LDP_GEN)};
+		//String[] all_mechanisms = {name(K_EDGE_NON_PRIVATE), name(K_EDGE_SEQ_RR), name(K_EDGE_PART_RR), name(TOP_K), name(GUESS), name(RANDOM_RESPONSE)};
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
 		//graph_statistics(DataLoader.ADVOGATO, all_mechanisms, all_eps);
 		count_triangles(DataLoader.CONGRESS_TWITTER, all_mechanisms, all_eps);
