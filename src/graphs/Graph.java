@@ -9,7 +9,7 @@ import java.util.HashSet;
 
 public class Graph {
 	int id_e = 0;
-	final String name;
+	public final String name;
 	
 	public int num_vertices;
 	private final ArrayList<Edge> edges = new ArrayList<Graph.Edge>();
@@ -45,10 +45,10 @@ public class Graph {
 		}
 	}
 
-	class Edge{
+	public class Edge{
 		//final int id;
-		final int from;
-		final int to;
+		public final int from;
+		public final int to;
 		
 		Edge(int from, int to){
 			this.from = from;
@@ -74,7 +74,7 @@ public class Graph {
 		return id_e++;
 	}
 	
-	public int[][] get_edges_for_sanitation(){
+	int[][] get_edges_for_sanitation(){
 		int[][] e = new int[edges.size()][2];
 		for(int i=0;i<edges.size();i++) {
 			Edge my_edge = edges.get(i);
@@ -144,7 +144,7 @@ public class Graph {
 		return g;
 	}
 
-	void add_edge(int from, int to) {
+	public void add_edge(int from, int to) {
 		new Edge(from, to);
 	}
 	
@@ -225,5 +225,15 @@ public class Graph {
 	public void to_file() {
 		String edge_list = to_edge_list();
 		to_file(edge_list);
+	}
+	
+	public int int_num_edges() {
+		return this.edges.size();
+	}
+	/**
+	 * @return
+	 */
+	public ArrayList<Edge> get_edges(){
+		return this.edges;
 	}
 }

@@ -101,11 +101,13 @@ public class TestGraphs {
 	static final int K_EDGE_PART_RR 	= 5;
 	static final int TOP_K			 	= 6;
 	static final int GUESS			 	= 7;
-	static final int LDP_GEN				= 8;
+	static final int LDP_GEN			= 8;
+	static final int CHUN_LU			= 9;
+	static final int TWO_K_SERIES		= 10;
 
 	static double e_q1 = 1.0;
 	
-	static Graph run(final Graph g, final int mechanism, final double epsilon) {
+	public static Graph run(final Graph g, final int mechanism, final double epsilon) {
 		Graph san_g;
 		if(mechanism==RANDOM_RESPONSE) {
 			san_g = Mechanism.radomized_response(g, epsilon);
@@ -124,12 +126,49 @@ public class TestGraphs {
 		}else if(mechanism==GUESS){
 			san_g = Mechanism.educated_guess(g, epsilon, false);
 		}else if(mechanism==LDP_GEN){
-			san_g = Mechanism.LDPGen(g, epsilon);
+			boolean non_private = false;
+			san_g = Mechanism.LDPGen(g, epsilon, non_private);
+		}else if(mechanism==TWO_K_SERIES){
+			boolean non_private = true;
+			san_g = Mechanism.two_k_series(g, epsilon, non_private);
+		}else if(mechanism==CHUN_LU){
+			boolean non_private = false;
+			boolean grouped = true;
+			san_g = Mechanism.Chun_Lu_Model(g, epsilon, non_private, grouped);
 		}else{
-			System.err.println("Unknown mechanism "+mechanism);
+			System.err.println("run() Unknown mechanism "+mechanism);
 			san_g = null;
 		}
 		return san_g;
+	}
+	
+	static String name(final int mechanism) {
+		if(mechanism==RANDOM_RESPONSE) {
+			return "RANDOM_RESPONSE";
+		}else if(mechanism==K_EDGE_NON_PRIVATE){
+			return "K_EDGE_NON_PRIVATE";
+		}else if(mechanism==K_EDGE_SEQ){
+			return "K_EDGE_SEQ";
+		}else if(mechanism==K_EDGE_SEQ_RR){
+			return "K_EDGE_SEQ_RR";
+		}else if(mechanism==K_EDGE_PART){
+			return "K_EDGE_PART";
+		}else if(mechanism==K_EDGE_PART_RR){
+			return "K_EDGE_PART_RR";
+		}else if(mechanism==TOP_K){
+			return "TOP_K";
+		}else if(mechanism==GUESS){
+			return "GUESS";
+		}else if(mechanism==LDP_GEN){
+			return "LDP_GEN";
+		}else if(mechanism==CHUN_LU){
+			return "CHUN_LU";
+		}else if(mechanism==TWO_K_SERIES){
+			return "TWO_K_SERIES";
+		}else{
+			System.err.println("name() Unknown mechanism "+mechanism);
+			return null;
+		}
 	}
 	
 	static void run(Graph g, int[] all_mechanisms) {
@@ -160,31 +199,6 @@ public class TestGraphs {
 		//String name = "k-edge with private grouping e_q1="+e_q1+" num_repitions="+num_repitions;
 		String name = name(mechanism)+" e_1="+e_q1+" num_repitions="+num_repitions;
 		ResultCollector.store(name, all_eps);
-	}
-	
-	static String name(final int mechanism) {
-		if(mechanism==RANDOM_RESPONSE) {
-			return "RANDOM_RESPONSE";
-		}else if(mechanism==K_EDGE_NON_PRIVATE){
-			return "K_EDGE_NON_PRIVATE";
-		}else if(mechanism==K_EDGE_SEQ){
-			return "K_EDGE_SEQ";
-		}else if(mechanism==K_EDGE_SEQ_RR){
-			return "K_EDGE_SEQ_RR";
-		}else if(mechanism==K_EDGE_PART){
-			return "K_EDGE_PART";
-		}else if(mechanism==K_EDGE_PART_RR){
-			return "K_EDGE_PART_RR";
-		}else if(mechanism==TOP_K){
-			return "TOP_K";
-		}else if(mechanism==GUESS){
-			return "GUESS";
-		}else if(mechanism==LDP_GEN){
-			return "LDP_GEN";
-		}else{
-			System.err.println("Unknown mechanism "+mechanism);
-			return null;
-		}
 	}
 	
 	static void matrialize_private_graphs(int[] graphs, int[] mechanism, int num_repitions, double[] all_eps) {
@@ -301,18 +315,19 @@ public class TestGraphs {
 
 	public static void main(String[] args) {
 		{
-			int[] graphs = {DataLoader.CONGRESS_TWITTER};
+			int[] graphs = {DataLoader.ADVOGATO};
 			//int[] mechanism = {K_EDGE_NON_PRIVATE, K_EDGE_SEQ_RR, K_EDGE_PART_RR, TOP_K, GUESS, RANDOM_RESPONSE};
-			int[] mechanism = {LDP_GEN};
+			int[] mechanism = {TWO_K_SERIES};
 			int num_repitions = 10;
 			double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-			matrialize_private_graphs(graphs, mechanism, num_repitions, all_eps);	
+			//matrialize_private_graphs(graphs, mechanism, num_repitions, all_eps);	
 		}
-		String[] all_mechanisms = {name(LDP_GEN)};
+		//System.exit(0);
+		String[] all_mechanisms = {name(LDP_GEN), name(CHUN_LU), name(TWO_K_SERIES)};
 		//String[] all_mechanisms = {name(K_EDGE_NON_PRIVATE), name(K_EDGE_SEQ_RR), name(K_EDGE_PART_RR), name(TOP_K), name(GUESS), name(RANDOM_RESPONSE)};
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-		//graph_statistics(DataLoader.ADVOGATO, all_mechanisms, all_eps);
-		count_triangles(DataLoader.CONGRESS_TWITTER, all_mechanisms, all_eps);
+		graph_statistics(DataLoader.ADVOGATO, all_mechanisms, all_eps);
+		//count_triangles(DataLoader.ADVOGATO, all_mechanisms, all_eps);
 		System.exit(0);
 		//Config.USE_RESULT_STATISTICS = true;
 		ArrayList<MaterializedGraphs> mg_s = DataLoader.get_sanitized_graphs(DataLoader.ADVOGATO);

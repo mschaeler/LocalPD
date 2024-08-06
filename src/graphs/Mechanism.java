@@ -9,10 +9,13 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.stream.IntStream;
 
+import algorithms.DK_Series;
 import algorithms.LaplaceStream;
 import misc.KMedoids;
 import misc.KMedoids.Clustering;
 import misc.TopK;
+import misc.Util;
+import results.Config;
 import results.TheoreticalAnalysis;
 
 public class Mechanism {
@@ -507,7 +510,7 @@ public class Mechanism {
 	 * @return
 	 */
 	@Deprecated
-	public static Graph k_edge_radomized_response(Graph g, final double p) {
+	static Graph k_edge_radomized_response(Graph g, final double p) {
 		Random rand = new Random(123456);
 		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
 		final double count_query_senstivity = 1;
@@ -675,7 +678,7 @@ public class Mechanism {
      * 
      * @return non-negative integer
      */
-    static final int sanitize(final double val, final double lambda) {
+    public static final int sanitize(final double val, final double lambda) {
         double noise = LaplaceStream.nextNumber() * lambda;
         double sanVal = val + noise;        
         //System.out.println(sanVal);
@@ -776,6 +779,30 @@ public class Mechanism {
 	}
 	
 	/**
+	 * Implements the private graph release approach based on 2K series statistics. The approach involves two main problems:
+	 * (1) Reduction of the noise injection, due to the high sensitivity of the 2kseries. Here, we rely on the approach in "Sharing Graphs Using Differentialy Private Graph Models"
+	 * (2) How to reconstruct the graph from the 2kseries. Here we rely on "2K+ Graph Construction Framework: Targeting Joint Degree Matrix and Beyond", https://escholarship.org/uc/item/5tb4f2mn
+	 * @param g
+	 * @param all_epsilon
+	 * @param not_private
+	 * @return
+	 */
+	public static Graph two_k_series(Graph g, final double all_epsilon, final boolean not_private) {
+		String name = "two_k_series()";
+		System.out.println(name);
+
+		double start = System.currentTimeMillis();
+		DK_Series dks = algorithms.DK_Series.two_k_series(g);
+		if(!not_private) {
+			dks.sanitize(all_epsilon);
+		}
+		Graph g_san = dks.reconstruct();
+		
+		Graph.stop(start, name);
+		return g_san;
+	}
+	
+	/**
 	 * top_k
 	 * @param g
 	 * @param p
@@ -845,19 +872,6 @@ public class Mechanism {
 		return new Graph(sanitized_neighbor_list,g.name+" educated_guess()");
 	}
 	
-	static int random_choice(final double[] probabilities, Random rand) {
-		final double threshold = rand.nextDouble(); //Some value in [0,1]. We return the
-		double prob = 0.0d;
-		for(int i=0;i<probabilities.length;i++) {
-			double p = probabilities[i];
-			prob += p;
-			if(prob>=threshold) {
-				return i;
-			}
-		}
-		System.err.println("Should never come till here");
-		return -1;
-	}
 	public static double[] to_probabilities(int[] noissy_u) {
 		double sum = 0.0d;
 		for(double d: noissy_u) {
@@ -877,10 +891,16 @@ public class Mechanism {
 	 * @param epsilon
 	 * @param epsilon_1
 	 * @return
+	 * 
+	 * XXX the problem is it gets worse with increasing, because we are omitting parts of the weight
 	 */
-	public static Graph LDPGen(final Graph g, final double epsilon) {
+	public static Graph LDPGen(final Graph g, final double epsilon, final boolean none_private) {
 		String name = "LDPGen";
-		System.out.println(name +" e="+ epsilon);
+		if(!none_private) {
+			System.out.println(name +" e="+ epsilon);	
+		}else{
+			System.err.println(name +" e="+ epsilon+ " none private");
+		}
 		double start = System.currentTimeMillis();
 		
 		//XXX According to Sec 4.7
@@ -919,8 +939,13 @@ public class Mechanism {
 				delta_u[target_partition]++;
 			}
 			for(int bin=0;bin<k_0;bin++) {
-				int san_bin_value = sanitize(delta_u[bin], lambda);
-				delta_u[bin] = san_bin_value;
+				if(!none_private) {
+					int san_bin_value = sanitize(delta_u[bin], lambda);
+					delta_u[bin] = san_bin_value;	
+				}else{
+					delta_u[bin] = delta_u[bin];//The value remains as it is
+				}
+				
 			}
 			final int eta = IntStream.of(delta_u).sum();//XXX Equation 1, page 429. Why does that work?
 			all_delta[vertex] = delta_u;
@@ -928,7 +953,7 @@ public class Mechanism {
 		}
 		
 		//Phase 1 - estimate optimal number of partitions k_1
-		final int max_degree = max(all_eta);
+		final int max_degree = Util.max(all_eta);
 		/**
 		 * H[degree] -> Pr(degree)
 		 * sum over all degrees = 1.0
@@ -971,8 +996,10 @@ public class Mechanism {
 				my_degree_vector[target_partition]++;
 			}
 			for(int bin=0;bin<k_1;bin++) {
-				int san_bin_value = sanitize(my_degree_vector[bin], lambda);
-				my_degree_vector[bin] = san_bin_value;
+				if(!none_private) {
+					int san_bin_value = sanitize(my_degree_vector[bin], lambda);
+					my_degree_vector[bin] = san_bin_value;	
+				}// else the value remains as it is
 			}
 			all_degree_vector_xi_1[vertex] = my_degree_vector;
 			final int noisy_degree_estimator_eta = IntStream.of(my_degree_vector).sum();//Equation 1, page 429
@@ -998,7 +1025,10 @@ public class Mechanism {
 		
 		//Phase 3 - generate edges
 		Graph san_g = new Graph(g.num_vertices, g.name+"_"+name);
-		Random rand = new Random(1234567);
+		//ldp_gen_phase_3(san_g, final_degree_estimations, k_1, xi_2);
+		create_vertices(san_g, final_degree_estimations, k_1, xi_2);
+		
+		/*Random rand = new Random(1234567);
 
 		double[] denom_2_all_j = new double[k_1];
 		for(double[] delta_v : final_degree_estimations) {//v \in G
@@ -1034,8 +1064,176 @@ public class Mechanism {
 				}
 			}
 		}
+		*/
 		Graph.stop(start, name);
 		return san_g;
+	}
+	
+	
+	public static int random_choice(final double[] probabilities, Random rand) {
+		final double threshold = rand.nextDouble(); //Some value in [0,1]. We return the
+		double prob = 0.0d;
+		for(int i=0;i<probabilities.length;i++) {
+			double p = probabilities[i];
+			prob += p;
+			if(prob>=threshold) {
+				return i;
+			}
+		}
+		System.err.println("Should never come till here");
+		return -1;
+	}
+	
+	static void create_vertices(final Graph san_g, final double[][] final_degree_estimations, final int k_1, final Clustering xi_2){
+		Random rand = new Random(1234567);
+		for(int i=0;i<k_1;i++) {
+			ArrayList<Integer> U_i = xi_2.getCluster(i);
+			for(int u : U_i) {
+				double[] my_deseired_out_degree = final_degree_estimations[u];
+				for(int j = 0; j < k_1; j++) {
+					ArrayList<Integer> U_j = xi_2.getCluster(j);
+					double[] probabilities = to_probabilities(U_j, i, final_degree_estimations);
+					HashSet<Integer> my_neighbors = new HashSet<Integer>();
+					for(int neighbor=0;neighbor<Math.round(my_deseired_out_degree[j]);neighbor++) {
+						int index = random_choice(probabilities, rand);
+						my_neighbors.add(U_j.get(index));//avoids duplicate edges
+					}
+					for(Integer v : my_neighbors) {
+						san_g.add_edge(u, v);
+					}
+				}
+			}
+		}
+		double sum = Util.sum(final_degree_estimations);
+		System.out.println("LDP Gen Phase 3 create_vertices(): Expected "+sum+" vertices and got "+san_g.int_num_edges());
+		System.out.println("Done");
+	}
+	
+	private static double[] to_probabilities(ArrayList<Integer> vertices, int target_partition, final double[][] final_degree_estimations) {
+		double[] p_s = new double[vertices.size()];
+		for(int i=0;i<vertices.size();i++) {
+			int vertex = vertices.get(i);
+			p_s[i] = 0.01+final_degree_estimations[vertex][target_partition];//avoid all zero case with some outdegree
+		}
+		double sum = Util.sum(p_s);
+		for(int i=0;i<vertices.size();i++) {
+			p_s[i] /= sum;
+		}
+		//System.out.println(sum(p_s));
+		return p_s;
+	}
+
+	/**
+	 * An application/interpretation of the Chun-Lu Model 
+	 * There, the input is the desire out degree per node as weight-vector W, with |W| = |V|
+	 * The probability of creating an edge (u,v) is W[u] * W[v] / sum(W)
+	 * 
+	 * Note, it must hold for any W[u], W[v] that W[u] * W[v] < sum(W)
+	 * </p>
+	 * William Aiello, Fan Chung, and Linyuan Lu. 2000. A random graph model for massive graphs. In Proceedings of the thirty-second annual ACM symposium on Theory of computing. Acm, 171–180.
+	 * 
+	 * @param san_g - Zhe empty sanitized graph to fill with edges
+	 * @param final_degree_estimations - Desired out degree of each vertex to each partition, \delta^u_j = final_degree_estimations[u][j]
+	 * @param k_1 - original graph number of partitions
+	 * @param xi_2 - original graph the graph partitions
+	 * 
+	 */
+	static void ldp_gen_phase_3(final Graph san_g, final double[][] final_degree_estimations, final int k_1, final Clustering xi_2){
+		/*out_tsv(final_degree_estimations);
+		for(int partition=0;partition<1;partition++) {
+			System.out.println("**********Cluster "+partition);
+			for(Integer arr : xi_2.getCluster(partition)) {
+				out_tsv(final_degree_estimations[arr]);
+			}
+		}*/
+		
+		Random rand = new Random(1234567);
+
+		ArrayList<double[]> all_partition_weight_sums = new ArrayList<double[]>(k_1);
+		
+		for(int partition=0;partition<k_1;partition++) {
+			double[] partition_weight_sum = new double[k_1];	
+			all_partition_weight_sums.add(partition_weight_sum);
+			
+			final ArrayList<Integer> p = xi_2.getCluster(partition);
+			for(int vertex : p) {
+				add(partition_weight_sum, final_degree_estimations[vertex]);
+			}
+		}
+		
+		for(int i=0;i<k_1;i++) {
+			ArrayList<Integer> U_i = xi_2.getCluster(i);
+			final double[] sum_weights_U_i = all_partition_weight_sums.get(i);
+			for(int u : U_i) {
+				for(int j = 0; j < k_1; j++) {
+					ArrayList<Integer> U_j = xi_2.getCluster(j); 
+					double[] sum_weights_U_j = all_partition_weight_sums.get(j);
+					for(int v : U_j) {
+						if(Config.USE_FIX) {
+							/**
+							 * Desired out degree of u to some vertex v \in U_j. This is correct in the paper.
+							 */
+							final double w_u = (i==j) ? final_degree_estimations[u][j] : final_degree_estimations[u][j]+final_degree_estimations[u][i];	//FIX
+							//final double w_u = final_degree_estimations[u][j];
+							/**
+							 * Average desired out degree of all vertex v \in U_j to a vertex \in U_i. 
+							 * Technically, we could also simply use final_degree_estimations[v][i]. I guess the authors wanted to mitigate some noise form the randomization by computing the average.
+							 * Note, presuming this is an instance of the Chun-Lu Model. The paper is wrong here. It iterates over all v \in G and consider the out degree to U_j. 
+							 * However, canonically w_v is the out degree of v to the rest of the graph, which is here only U_i, because of the partitioning. We corrected that, also in the denominator.
+							 * This is backuped by the statement "the denominator is the total number of edges between groups i and j by aggregating all the elements in the nodes’ corresponding degree vectors in two gr"
+							 */
+							final double w_v = (i==j) ? final_degree_estimations[v][i] :  final_degree_estimations[v][i]+ final_degree_estimations[v][j];//FIX 
+							//final double w_v = sum_weights_U_j[i] / U_j.size();
+							final double sum_weights = sum_weights_U_i[j] + sum_weights_U_j[i];
+							/**
+							 * probability of drawing a directed edge (u,v)
+							 */
+							double p = w_u * w_v / sum_weights;
+							if(p>1.0) {
+								//System.err.println("p>1.0 p="+p);
+								p=1.0d;
+							}
+							double dice = rand.nextDouble();
+							if(dice<=p) {
+								san_g.add_edge(u, v);
+							}
+						}else {
+							/**
+							 * Desired out degree of u to some vertex v \in U_j. This is correct in the paper.
+							 */
+							//final double w_u = (i==j) ? final_degree_estimations[u][j] : final_degree_estimations[u][j]+final_degree_estimations[u][i];	//FIX
+							final double w_u = final_degree_estimations[u][j];
+							/**
+							 * Average desired out degree of all vertex v \in U_j to a vertex \in U_i. 
+							 * Technically, we could also simply use final_degree_estimations[v][i]. I guess the authors wanted to mitigate some noise form the randomization by computing the average.
+							 * Note, presuming this is an instance of the Chun-Lu Model. The paper is wrong here. It iterates over all v \in G and consider the out degree to U_j. 
+							 * However, canonically w_v is the out degree of v to the rest of the graph, which is here only U_i, because of the partitioning. We corrected that, also in the denominator.
+							 * This is backuped by the statement "the denominator is the total number of edges between groups i and j by aggregating all the elements in the nodes’ corresponding degree vectors in two gr"
+							 */
+							//final double w_v = (i==j) ? sum_weights_U_j[i] / U_j.size() : sum_weights_U_i[j] / U_i.size()+sum_weights_U_j[i] / U_j.size();//FIX 
+							final double w_v = sum_weights_U_j[i] / U_j.size();
+							final double sum_weights = sum_weights_U_i[j] + sum_weights_U_j[i];
+							/**
+							 * probability of drawing a directed edge (u,v)
+							 */
+							double p = w_u * w_v / sum_weights;
+							if(p>1.0) {
+								//System.err.println("p>1.0 p="+p);
+								p=1.0d;
+							}
+							double dice = rand.nextDouble();
+							if(dice<=p) {
+								san_g.add_edge(u, v);
+						}
+						}
+					}
+				}	
+			}
+		}
+		
+		double sum = Util.sum(final_degree_estimations);
+		System.out.println("LDP Gen Phase 3: Expected "+sum+" vertices and got "+san_g.int_num_edges());
+		System.out.println("Done");
 	}
 
 	private static void add(final double[] sum, final double[] add_me) {
@@ -1046,16 +1244,6 @@ public class Mechanism {
 		for(int i=0;i<sum.length;i++) {
 			sum[i] +=  add_me[i];
 		}
-	}
-	
-	private static final int max(int[] arr) {
-		int max_value = Integer.MIN_VALUE;
-		for(int v : arr) {
-			if(v>max_value) {
-				max_value = v;  
-			}
-		}
-		return max_value;
 	}
 	
 	/**
@@ -1070,19 +1258,125 @@ public class Mechanism {
 		double sum = 0.0d;
 		for(int j = 0;j<u_1_all.length;j++) {//cluster = j in the paper
 			ArrayList<Integer> u_1_j = u_1_all[j];//U^1_j in the paper
-			HashSet<Integer> intersection = new HashSet<Integer>();
-			intersection.addAll(u_2_i);
-			int count = 0;
-			for(int e : u_1_j) {
-				if(intersection.contains(e)) {
-					count++;
+			if(u_1_j.isEmpty()) {
+				//Do nothing
+			}else{
+				HashSet<Integer> intersection = new HashSet<Integer>();
+				intersection.addAll(u_2_i);
+				int count = 0;
+				for(int e : u_1_j) {
+					if(intersection.contains(e)) {
+						count++;
+					}
 				}
+				double temp = count;
+				temp /= (double) u_1_j.size();
+				temp *= (double) delta[j];//should be \delta^u_j, but is \delta_j in the paper
+				if (Double.isNaN(temp)) {
+				    System.err.println("NaN");
+				}
+				sum+= temp;
 			}
-			double temp = count;
-			temp /= (double) u_1_j.size();
-			temp *= (double) delta[j];//should be \delta^u_j, but is \delta_j in the paper
-			sum+= temp;
 		}
 		return sum;
 	}
+	
+	public static Graph Chun_Lu_Model(Graph g, final double epsilon, final boolean none_private, final boolean partioned) {
+		String name = "Chun_Lu";
+		System.out.println(name);
+		double start = System.currentTimeMillis();
+		
+		Random rand = new Random(1234567);
+		ArrayList<Integer>[] N = g.get_neighbors();
+		Graph san_g = new Graph(g.num_vertices, g.name+"_"+name);
+		final double[] weights = new double[g.num_vertices];
+		
+		//Execute Q 1: get desired out degree
+		for(int vertex=0;vertex<g.num_vertices;vertex++) {
+			if(none_private) {
+				weights[vertex] = N[vertex].size();	
+			}else{
+				weights[vertex] = q_1(N[vertex], count_query_senstivity, epsilon);
+			}
+		}
+		
+		if(partioned) {
+			int num_clusters = 2;//guess
+			HashMap<Integer, Integer> partition_assigenments = new HashMap<Integer, Integer>(g.num_vertices);
+			for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+				partition_assigenments.put(vertex, vertex%num_clusters);
+			}
+			
+			final int[][] out_degrees_per_partition = new int[g.num_vertices][];
+			for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+				ArrayList<Integer> my_neighbors = N[vertex];
+				final int[] out_degree = new int[num_clusters];
+				for(int target : my_neighbors) {
+					int target_partition = partition_assigenments.get(target);
+					out_degree[target_partition]++;
+				}
+				out_degrees_per_partition[vertex] = out_degree;
+			}
+			Clustering clusters = new KMedoids(out_degrees_per_partition, num_clusters).run();
+			System.out.println(clusters);
+			int k_2 = 3;
+			for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+				ArrayList<Integer> my_neighbors = N[vertex];
+				final int[] out_degree = new int[k_2];
+				for(int target : my_neighbors) {
+					int target_partition = partition_assigenments.get(target);
+					out_degree[target_partition]++;
+				}
+				out_degrees_per_partition[vertex] = out_degree;
+			}
+			clusters = new KMedoids(out_degrees_per_partition, k_2).run();
+			partition_assigenments = clusters.to_hash_map();
+			System.out.println(clusters);
+			
+			final double[][] temp = new double[g.num_vertices][k_2];
+			for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+				ArrayList<Integer> my_neighbors = N[vertex];
+				final int[] out_degree = new int[k_2];
+				for(int target : my_neighbors) {
+					int target_partition = partition_assigenments.get(target);
+					temp[vertex][target_partition]++;
+				}
+				out_degrees_per_partition[vertex] = out_degree;
+			}
+			
+			for(int vertex = 0; vertex<g.num_vertices;vertex++) {
+				ArrayList<Integer> my_neighbors = N[vertex];
+				final int[] out_degree = new int[k_2];
+				for(int target : my_neighbors) {
+					int target_partition = partition_assigenments.get(target);
+					out_degree[target_partition]++;
+				}
+				out_degrees_per_partition[vertex] = out_degree;
+			}
+			
+			ldp_gen_phase_3(san_g, temp, k_2, clusters);
+		}else{
+			//Q2 here costs no budget
+			final double sum_weights = Util.sum(weights);
+			for(int u=0;u<g.num_vertices;u++) {
+				for(int v=0;v<g.num_vertices;v++) {
+					double p = weights[u] * weights[v] / sum_weights;
+					if(p>1.0) {
+						System.err.println("p>1.0 p="+p);
+						p=1.0d;
+					}
+					double dice = rand.nextDouble();
+					if(dice<p) {
+						san_g.add_edge(u, v);
+					}
+				}
+			}
+		}
+		
+		
+		Graph.stop(start, name);
+		return san_g;
+	}
+
+
 }
