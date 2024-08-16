@@ -245,6 +245,7 @@ public class Metrics {
 	}
 	/**
 	 * returns average proximity per sanitized graph
+	 * [I,avg dist(),pp]
 	 */
 	public static final double[] proximity_prestige(final ArrayList<Graph> sanitized_gs) {
 		ArrayList<double[]> temp_results = new ArrayList<double[]>(sanitized_gs.size());

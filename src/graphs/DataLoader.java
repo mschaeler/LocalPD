@@ -370,10 +370,10 @@ public class DataLoader {
 							if(target<num_node && target>=0) {
 								g.add_edge(source, target);
 							}else{
-								System.err.println("target<num_node && target>=0");
+								System.err.println("get_graph_from_edge_list() target<num_node && target>=0");
 							}
 						}else{
-							System.err.println("source<num_node && source>=0");
+							System.err.println("get_graph_from_edge_list() source<num_node && source>=0");
 						}
 					} catch (Exception e) {
 						// TODO: handle exception

@@ -104,6 +104,7 @@ public class TestGraphs {
 	static final int LDP_GEN			= 8;
 	static final int CHUN_LU			= 9;
 	static final int TWO_K_SERIES		= 10;
+	static final int M_PART				= 11;
 
 	static double e_q1 = 1.0;
 	
@@ -135,6 +136,8 @@ public class TestGraphs {
 			boolean non_private = false;
 			boolean grouped = true;
 			san_g = Mechanism.Chun_Lu_Model(g, epsilon, non_private, grouped);
+		}else if(mechanism==M_PART){
+			san_g = Mechanism.m_part(g, epsilon, e_q1);
 		}else{
 			System.err.println("run() Unknown mechanism "+mechanism);
 			san_g = null;
@@ -165,6 +168,8 @@ public class TestGraphs {
 			return "CHUN_LU";
 		}else if(mechanism==TWO_K_SERIES){
 			return "TWO_K_SERIES";
+		}else if(mechanism==M_PART){
+			return "M_PART";
 		}else{
 			System.err.println("name() Unknown mechanism "+mechanism);
 			return null;
@@ -215,6 +220,83 @@ public class TestGraphs {
 		}
 	}
 	
+	static void graph_proximity_prestige(int graph_enum, String[] all_m, double[] all_e) {
+		System.out.println("***graph_proximity_prestige("+DataLoader.get_graph_name(graph_enum)+") " + Arrays.toString(all_m)+" "+Arrays.toString(all_e));
+		
+		ArrayList<MaterializedGraphs> mg_s = DataLoader.get_sanitized_graphs(graph_enum);
+		ArrayList<ArrayList<String[]>> all_results_i = new ArrayList<ArrayList<String[]>>();
+		ArrayList<ArrayList<String[]>> all_results_dist = new ArrayList<ArrayList<String[]>>();
+		ArrayList<ArrayList<String[]>> all_results_pp = new ArrayList<ArrayList<String[]>>();
+		
+		for(String approach : all_m) {
+			System.out.println(approach);
+			ArrayList<MaterializedGraphs> graphs_of_mechanism = MaterializedGraphs.filter_by_mechanism(mg_s, approach);
+			ArrayList<String[]> out_i = new ArrayList<String[]>();
+			ArrayList<String[]> out_dist = new ArrayList<String[]>();
+			ArrayList<String[]> out_pp = new ArrayList<String[]>();
+			
+			for(double epsilon : all_e) {
+				System.out.println(epsilon);
+				ArrayList<MaterializedGraphs> temp = MaterializedGraphs.filter_by_epsilon(graphs_of_mechanism, epsilon);
+				ArrayList<Graph> g_s = DataLoader.get_sanitized_graphs(temp);
+				double[] res = Metrics.proximity_prestige(g_s);
+				System.out.println(Arrays.toString(res));
+				String[] line_i = {""+epsilon, ""+(res[0])};
+				out_i.add(line_i);
+				String[] line_dist = {""+epsilon, ""+(res[1])};
+				out_dist.add(line_dist);
+				String[] line_pp = {""+epsilon, ""+(res[2])};
+				out_pp.add(line_pp);
+			}
+			System.out.println(approach);
+			for(String[] arr : out_i) {
+				System.out.println(Arrays.toString(arr));
+			}
+			for(String[] arr : out_dist) {
+				System.out.println(Arrays.toString(arr));
+			}
+			for(String[] arr : out_pp) {
+				System.out.println(Arrays.toString(arr));
+			}
+			all_results_i.add(out_i);
+			all_results_dist.add(out_dist);
+			all_results_pp.add(out_pp);
+		}
+		String header = "eps\t";
+		for(String approach : all_m) {
+			header+=approach+"\t";
+		}
+		System.out.println(DataLoader.get_graph_name(graph_enum)+" Avg proximity prestige: |I|");
+		System.out.println(header);
+		int num_lines = all_results_i.get(0).size();
+		for(int line=0;line<num_lines;line++) {
+			System.out.print(all_results_i.get(0).get(line)[0]+"\t");//Epsilon
+			for(ArrayList<String[]> r : all_results_i) {
+				System.out.print(r.get(line)[1]+"\t");
+			}
+			System.out.println();
+		}
+		System.out.println(DataLoader.get_graph_name(graph_enum)+" Avg proximity prestige: avg(dist())");
+		System.out.println(header);
+		num_lines = all_results_dist.get(0).size();
+		for(int line=0;line<num_lines;line++) {
+			System.out.print(all_results_dist.get(0).get(line)[0]+"\t");//Epsilon
+			for(ArrayList<String[]> r : all_results_dist) {
+				System.out.print(r.get(line)[1]+"\t");
+			}
+			System.out.println();
+		}
+		System.out.println(DataLoader.get_graph_name(graph_enum)+" Avg proximity prestige: pp");
+		System.out.println(header);
+		num_lines = all_results_pp.get(0).size();
+		for(int line=0;line<num_lines;line++) {
+			System.out.print(all_results_pp.get(0).get(line)[0]+"\t");//Epsilon
+			for(ArrayList<String[]> r : all_results_pp) {
+				System.out.print(r.get(line)[1]+"\t");
+			}
+			System.out.println();
+		}
+	}
 	
 	static void graph_statistics(int graph_enum, String[] all_m, double[] all_e) {
 		System.out.println("***graph_statistics("+DataLoader.get_graph_name(graph_enum)+") " + Arrays.toString(all_m)+" "+Arrays.toString(all_e));
@@ -315,19 +397,21 @@ public class TestGraphs {
 
 	public static void main(String[] args) {
 		{
-			int[] graphs = {DataLoader.ADVOGATO};
+			int[] graphs = {DataLoader.ENRON_SINGLE_EDGE};
 			//int[] mechanism = {K_EDGE_NON_PRIVATE, K_EDGE_SEQ_RR, K_EDGE_PART_RR, TOP_K, GUESS, RANDOM_RESPONSE};
-			int[] mechanism = {TWO_K_SERIES};
+			int[] mechanism = {M_PART};
 			int num_repitions = 10;
 			double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
 			//matrialize_private_graphs(graphs, mechanism, num_repitions, all_eps);	
 		}
-		//System.exit(0);
-		String[] all_mechanisms = {name(LDP_GEN), name(CHUN_LU), name(TWO_K_SERIES)};
+		System.exit(0);
+		//String[] all_mechanisms = {name(LDP_GEN), name(CHUN_LU), name(TWO_K_SERIES), name(M_PART)};
+		String[] all_mechanisms = {name(K_EDGE_NON_PRIVATE), name(M_PART)};
 		//String[] all_mechanisms = {name(K_EDGE_NON_PRIVATE), name(K_EDGE_SEQ_RR), name(K_EDGE_PART_RR), name(TOP_K), name(GUESS), name(RANDOM_RESPONSE)};
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-		graph_statistics(DataLoader.ADVOGATO, all_mechanisms, all_eps);
-		//count_triangles(DataLoader.ADVOGATO, all_mechanisms, all_eps);
+		//graph_statistics(DataLoader.ADVOGATO, all_mechanisms, all_eps);
+		//count_triangles(DataLoader.CONGRESS_TWITTER, all_mechanisms, all_eps);
+		graph_proximity_prestige(DataLoader.ADVOGATO, all_mechanisms, all_eps);
 		System.exit(0);
 		//Config.USE_RESULT_STATISTICS = true;
 		ArrayList<MaterializedGraphs> mg_s = DataLoader.get_sanitized_graphs(DataLoader.ADVOGATO);

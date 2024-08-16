@@ -127,12 +127,49 @@ public class TheoreticalAnalysis {
 		return result;
 	}
 	
+	/**
+	 * 
+	 * @param epsilon_j
+	 * @param num_vertices |V|
+	 * @param degree estimation of the degree c_s
+	 * @return
+	 * 
+	 * solve [//math:ln(((1-a)+(1-(a/b)^k))/(1-(a/b)^k)) = x//] for [//math:x//]
+	 * solve [//math:ln(((1-p)+(1-(p/v)^k))/(1-(p/v)^k)) = eps//] for [//math:eps//]
+	 * solve [//math:ln(((1-(1/(1+exp(a))))+(1-((1+exp(a))/v)^k))/(1-((1+exp(a))/v)^k)) = eps//] for [//math:eps//]
+	 * solve [//math: r = (p (1-(p/v))^k-1) / ((1-(p/v))^k-1)//] for [//math:r//]
+	 * solve [//math: r = ((1/(1+exp(eps))) (1-((1/(1+exp(eps)))/v))^k-1) / ((1-((1/(1+exp(eps)))/v))^k-1)//] and eps = 1 and v=1 and k=2 for [//math:r//]
+	 */
+	static double to_delta_pr(final double epsilon_j, final double num_vertices, final double degree) {
+		if(degree>num_vertices) {
+			System.err.println(degree>num_vertices);
+			return -1;
+		}
+		if(epsilon_j<0.0d) {
+			System.err.println("epsilon_j<0.0d");
+			return -1;
+		}
+		double p = Mechanism.epsilon_to_p(epsilon_j);
+		
+		double p_by_v = p / num_vertices;
+		/**
+		 * 
+		 */
+		double p_by_uniform_sampling = 1.0d - (Math.pow(1.0d-p_by_v, degree));
+		double delta_p = ((1.0d-p)+p_by_uniform_sampling)/p_by_uniform_sampling;
+		System.out.println("e_j ="+epsilon_j+" |V|="+num_vertices+" c_s="+degree+" p="+p+" p_by_v="+p_by_v+" p_by_uniform_sampling="+p_by_uniform_sampling+" delta_p="+delta_p);
+		return delta_p;
+	}
+	
 	
 	public static void main(String[] args) {
 		//error_rr();
 		//error_k_edge_non_private();
 		//error_k_edge_seq_comp();
-		error_k_edge_random_part();
+		//error_k_edge_random_part();
+		to_delta_pr(1, 1, 1);
+		to_delta_pr(1, 2, 1);
+		to_delta_pr(1, 2, 2);
 	}
 }
 

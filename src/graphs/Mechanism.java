@@ -329,6 +329,134 @@ public class Mechanism {
 		return new Graph(sanitized_neighbor_list,g.name+" k_edge_radomized_response_non_private_grouping() use_seq_composition="+use_seq_composition);
 	}
 
+	public static ArrayList<Integer> rr_fall_back(final int node, final double p, ArrayList<Integer>[] neighbor_list, Graph g, Random rand) {
+		//System.out.println("Fall back");
+		final boolean[] adjacency_matrix_line = new boolean[g.num_vertices];
+		final boolean[] sanitized_adjacency_matrix_line = new boolean[g.num_vertices];
+		
+		ArrayList<Integer> my_sanitized_neighbors = new ArrayList<Integer>();
+		Arrays.fill(adjacency_matrix_line, false);
+		Arrays.fill(sanitized_adjacency_matrix_line, false);
+		for(int target_node : neighbor_list[node]) {
+			adjacency_matrix_line[target_node] = true;
+		}
+		for(int target_node=0;target_node<g.num_vertices;target_node++) {
+			double dice = rand.nextDouble();
+			boolean create_edge;
+			if(dice <= (1-p)) {//with probability 1-p return the real value
+				create_edge = adjacency_matrix_line[target_node];
+			}else {//else flip the bit
+				create_edge = (adjacency_matrix_line[target_node]) ? false : true;
+			}
+			if(create_edge) {
+				my_sanitized_neighbors.add(target_node);
+			}
+		}
+		return my_sanitized_neighbors;
+	}
+	
+	public static Graph m_part(Graph g, final double all_epsilon, final double epsilon_q1) {
+		String name = "m_part() e="+all_epsilon+" e_1="+epsilon_q1;
+		System.out.println(name);
+		double start = System.currentTimeMillis();
+		Random rand = new Random(123456);
+		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
+		
+		//distribute budget
+		final double count_query_epsilon = epsilon_q1;
+		final double epsilon_q2 = all_epsilon-epsilon_q1;
+		final double p = epsilon_to_p(epsilon_q2);
+		
+		@SuppressWarnings("unchecked")
+		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
+		
+		boolean[] duplicate_check = new boolean[g.num_vertices];
+		
+		for(int node=0;node<g.num_vertices;node++) {
+			Arrays.fill(duplicate_check, false);
+
+			//Execute Q1
+			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
+			
+			//Decide whether we use k-edge or fall back to randomized response
+			double error_rr = TheoreticalAnalysis.error_rr(sanitized_number_of_outgoing_egdes, epsilon_q2, g.num_vertices)[0];
+			double error_k_edge = TheoreticalAnalysis.error_k_edge_random_part(sanitized_number_of_outgoing_egdes, all_epsilon)[0];//TODO
+			ArrayList<Integer> my_sanitized_neighbors;
+			
+			
+			if(sanitized_number_of_outgoing_egdes<=0) {
+				my_sanitized_neighbors = new ArrayList<Integer>();
+			}else if(error_rr<error_k_edge){
+				//rr-fallback
+				my_sanitized_neighbors = rr_fall_back(node, p, neighbor_list, g, rand);
+			}else{
+				//Partition and Shuffle the data
+				if(sanitized_number_of_outgoing_egdes>=g.num_vertices) {
+					System.err.println("sanitized_number_of_outgoing_egdes>=g.num_vertices");
+				}
+				ArrayList<Integer> neighbors = neighbor_list[node];
+				Collections.shuffle(neighbors);
+				
+				
+				ArrayList<Integer> my_neighbors = new ArrayList<Integer>();
+				for(int i=0;i<Math.min(sanitized_number_of_outgoing_egdes, neighbors.size());i++) {
+					my_neighbors.add(neighbors.get(i));//Trick. real edges may become fake ones
+				}
+
+				boolean[] true_edges = new boolean[g.num_vertices];
+				for(int my_edge : my_neighbors) {
+					true_edges[my_edge] = true;// Note here I access the true data. Thus the partitioning scheme is not private
+				}
+				ArrayList<Integer> fake_edges = new ArrayList<Integer>(g.num_vertices);
+				for(int target_vertex=0;target_vertex<g.num_vertices;target_vertex++) {
+					if(!true_edges[target_vertex]) {//can be used as fake edge
+						fake_edges.add(target_vertex);
+					}
+				}
+				Collections.shuffle(fake_edges);//also ensure uniform picks of fake edges
+				if(my_neighbors.size()+fake_edges.size()!=g.num_vertices){//Sanity check
+					System.err.println("my_neighbors.size()+fake_edges.size()!=g.num_vertices");
+				}
+				M_Part_Partition[] my_partitions = new M_Part_Partition[sanitized_number_of_outgoing_egdes];
+				for(int i=0;i<my_partitions.length;i++) {
+					if(i<my_neighbors.size()) {//ordinary partition
+						my_partitions[i] = new M_Part_Partition(i, my_neighbors);
+					}else{//fill-up partition
+						my_partitions[i] = new M_Part_Partition(i);
+					}
+				}
+				//Randomly distribute fake edges
+				for(int i=0;i<fake_edges.size();i++) {
+					int f_edge = fake_edges.get(i);
+					my_partitions[i%sanitized_number_of_outgoing_egdes].fake_edges.add(f_edge);
+				}
+					
+				//TODO remove me
+				M_Part_Partition.check_partitions(node, my_partitions, my_neighbors, fake_edges, g, neighbors);
+				final double probability = M_Part_Partition.get_p(my_partitions, epsilon_q2);
+				my_sanitized_neighbors = new ArrayList<Integer>();
+				for(int i=0;i<my_partitions.length;i++) {
+					int neighbor_s = my_partitions[i].generalized_rr(probability, rand);
+					if(neighbor_s<0||neighbor_s>g.num_vertices-1) {
+						System.err.println("neighbor_s<0||neighbor_s>g.num_vertices-1");
+					}
+					my_sanitized_neighbors.add(neighbor_s);
+				}
+			
+			}
+			
+			sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			
+			if(node%10000==0) {
+				System.out.println("node="+node);
+			}
+		}
+		Graph.stop(start, "m_part()");
+		return new Graph(sanitized_neighbor_list, g.name+" "+name);
+	}
+	
+	
+	
 	public static Graph k_edge_radomized_response_partitioned(Graph g, final double all_epsilon, final double epsilon_q1, boolean rr_fall_back) {
 		String name = "k_edge_radomized_response_partitioned() e="+all_epsilon+" e_1="+epsilon_q1+" rr_fall_back="+rr_fall_back;
 		System.out.println(name);
