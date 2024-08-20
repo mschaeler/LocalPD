@@ -37,6 +37,30 @@ public class Metrics {
 		return s;
 	}
 
+	public static final int[] edge_edit_dist(ArrayList<Integer> l_1, ArrayList<Integer> l_2, int num_vertices) {
+		boolean[] l_1_n = new boolean[num_vertices];
+		boolean[] l_2_n = new boolean[num_vertices];
+		for(int e : l_1) {
+			l_1_n[e] = true;
+		}
+		for(int e : l_2) {
+			l_2_n[e] = true;
+		}
+		int[] error = new int[4];
+		for(int e=0;e<num_vertices;e++) {
+			if(l_1_n[e] && l_2_n[e]) {
+				error[correct_edge]++;
+			}else if(l_1_n[e] && !l_2_n[e]){//there should be an edged, but there is none
+				error[missing_edge]++;
+			}else if(!l_1_n[e] && l_2_n[e]){//we invented a new edge
+				error[new_fake_edge]++;
+			}else{//in both cases there is no edge
+				error[correct_none_edge]++;
+			}
+		}
+		return error;
+	}
+	
 	public static final double[] avg_edge_edit_dist(Graph original_g, ArrayList<Graph> sanitized_gs) {
 		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
 		ArrayList<double[]> all_sums = new ArrayList<double[]>();

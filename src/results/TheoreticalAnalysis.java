@@ -1,5 +1,6 @@
 package results;
 
+import graphs.M_Part_Partition;
 import graphs.Mechanism;
 
 public class TheoreticalAnalysis {
@@ -170,6 +171,14 @@ public class TheoreticalAnalysis {
 		to_delta_pr(1, 1, 1);
 		to_delta_pr(1, 2, 1);
 		to_delta_pr(1, 2, 2);
+	}
+	public static double error_m_part(double c_s, double epsilon_q1, double epsilon_q2, double num_vertices) {
+		double error = 1.0d / epsilon_q1; // Error from q1
+		double partition_size = num_vertices / c_s;
+		double p = M_Part_Partition.get_p(epsilon_q2, partition_size);
+		error += 2.0d*c_s*(1.0d-p);//for every new fake edge, we miss one real edge, i.e., we have to double te error
+		
+		return error;
 	}
 }
 

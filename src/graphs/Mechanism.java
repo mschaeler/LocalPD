@@ -355,8 +355,8 @@ public class Mechanism {
 		return my_sanitized_neighbors;
 	}
 	
-	public static Graph m_part(Graph g, final double all_epsilon, final double epsilon_q1) {
-		String name = "m_part() e="+all_epsilon+" e_1="+epsilon_q1;
+	public static Graph m_sample(Graph g, final double all_epsilon, final double epsilon_q1) {
+		String name = "m_sample() e="+all_epsilon+" e_1="+epsilon_q1;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
 		Random rand = new Random(123456);
@@ -390,6 +390,190 @@ public class Mechanism {
 				//rr-fallback
 				my_sanitized_neighbors = rr_fall_back(node, p, neighbor_list, g, rand);
 			}else{
+				ArrayList<Integer> my_neighbors = neighbor_list[node];
+				my_sanitized_neighbors = new ArrayList<Integer>();
+				final double my_scores[] = new double[g.num_vertices];
+				for(int edge : my_neighbors) {
+					my_scores[edge] = Sample.SCORE_EXISTING_EDGE;//for all other edges it remains zero
+				}
+				for(int edge=0;edge<my_scores.length;edge++) {
+					my_scores[edge] = Math.pow(Math.E,epsilon_q2/(double)sanitized_number_of_outgoing_egdes*my_scores[edge]/(2.0d*Sample.delta_u()));
+				}
+				HashSet<Integer> edges = new HashSet<Integer>();//We do not want duplicates
+				for(int i=0;i<sanitized_number_of_outgoing_egdes;i++) {
+					edges.add(sample(my_scores, rand));
+				}
+				while(edges.size()<sanitized_number_of_outgoing_egdes){//Since we discard duplicates, we might have less than sanitized_number_of_outgoing_egdes edges. Sample the remaining ones with zero budget.
+					edges.add(rand.nextInt(g.num_vertices));//Sample uniformly, i.e., with budget \epsilon = 0
+				}
+				for(int edge : edges) {
+					my_sanitized_neighbors.add(edge);
+				}
+			}
+			
+			sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			
+			if(node%10000==0) {
+				System.out.println("node="+node);
+			}
+		}
+		Graph.stop(start, "m_sample()");
+		return new Graph(sanitized_neighbor_list, g.name+" "+name);
+	}
+	
+	public static Graph m_sample_weighted(Graph g, final double all_epsilon, final double epsilon_q1) {
+		String name = "m_sample_weighted() e="+all_epsilon+" e_1="+epsilon_q1;
+		System.out.println(name);
+		double start = System.currentTimeMillis();
+		Random rand = new Random(123456);
+		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
+		
+		//distribute budget
+		final double count_query_epsilon = epsilon_q1;
+		final double epsilon_q2 = all_epsilon-epsilon_q1;
+		final double p = epsilon_to_p(epsilon_q2);
+		
+		@SuppressWarnings("unchecked")
+		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
+		
+		boolean[] duplicate_check = new boolean[g.num_vertices];
+		double sum_error_expected = 0;
+		double sum_error_observed = 0;
+		/**
+		 * Frequency of each node as target
+		 * XXX make private
+		 */
+		final double[] histogram   = new double[g.num_vertices];
+		
+		for(int node=0;node<g.num_vertices;node++) {//TODO locally DP?
+			final ArrayList<Integer> my_true_neighbors = neighbor_list[node];
+			for(int neighbor : my_true_neighbors) {
+				histogram[neighbor]++;
+			}
+		}
+		to_probabilities(histogram);
+		
+		for(int node=0;node<g.num_vertices;node++) {
+			Arrays.fill(duplicate_check, false);
+
+			//Execute Q1
+			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
+			
+			//Decide whether we use k-edge or fall back to randomized response
+			double error_rr = TheoreticalAnalysis.error_rr(sanitized_number_of_outgoing_egdes, epsilon_q2, g.num_vertices)[0];
+			//double error_k_edge = TheoreticalAnalysis.error_k_edge_random_part(sanitized_number_of_outgoing_egdes, all_epsilon)[0];//TODO
+			double error_k_edge = TheoreticalAnalysis.error_m_part(sanitized_number_of_outgoing_egdes,count_query_epsilon, epsilon_q2, g.num_vertices);
+			ArrayList<Integer> my_sanitized_neighbors;
+			
+			
+			if(sanitized_number_of_outgoing_egdes<=0) {
+				my_sanitized_neighbors = new ArrayList<Integer>();
+			}else if(error_rr<error_k_edge){
+				//rr-fallback
+				my_sanitized_neighbors = rr_fall_back(node, p, neighbor_list, g, rand);
+			}else{
+				ArrayList<Integer> my_neighbors = neighbor_list[node];
+				my_sanitized_neighbors = new ArrayList<Integer>();
+				final double my_scores[] = new double[g.num_vertices];
+				for(int edge : my_neighbors) {
+					my_scores[edge] = Sample.SCORE_EXISTING_EDGE;//for all other edges it remains zero
+				}
+				for(int edge=0;edge<my_scores.length;edge++) {//TODO min()
+					my_scores[edge] = Math.pow(Math.E,epsilon_q2/(double)sanitized_number_of_outgoing_egdes*my_scores[edge]/(2.0d*Sample.delta_u()));
+				}
+				to_probabilities(my_scores);
+				for(int edge=0;edge<my_scores.length;edge++) {
+					my_scores[edge] +=  histogram[edge];//this is the trick
+				}
+				
+				HashSet<Integer> edges = new HashSet<Integer>();//We do not want duplicates
+				for(int i=0;i<sanitized_number_of_outgoing_egdes;i++) {
+					edges.add(sample(my_scores, rand));
+				}
+				while(edges.size()<sanitized_number_of_outgoing_egdes){//Since we discard duplicates, we might have less than sanitized_number_of_outgoing_egdes edges. Sample the remaining ones with zero budget.
+					edges.add(rand.nextInt(g.num_vertices));//Sample uniformly, i.e., with budget \epsilon = 0
+				}
+				for(int edge : edges) {
+					my_sanitized_neighbors.add(edge);
+				}
+				int[] local_error = Metrics.edge_edit_dist(my_neighbors, my_sanitized_neighbors, g.num_vertices);
+				double wrong = local_error[Metrics.missing_edge]+local_error[Metrics.new_fake_edge];
+				//if(Math.abs(error_m_part_2-wrong)>10.0d) {
+				//	System.out.println("id="+node+" Expecting\t"+error_k_edge+"\tgot\t"+(wrong)+"\terror_rr=\t"+error_rr+"\t"+Arrays.toString(local_error)+"\t|N|="+my_neighbors.size());	
+				//}
+				sum_error_expected += error_k_edge;
+				sum_error_observed += wrong;
+			}
+			
+			
+			sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			
+			if(node%10000==0) {
+				System.out.println("node="+node);
+			}
+		}
+		System.out.println("sum_error_expected="+sum_error_expected+" sum_error_observed="+sum_error_observed+" |G|="+g.num_vertices);
+		Graph.stop(start, "m_sample_weighted()");
+		return new Graph(sanitized_neighbor_list, g.name+" "+name);
+	}
+	
+	static int sample(final double my_scores[], Random rand) {
+		final double sum = Util.sum(my_scores);
+		final double diced_score = rand.nextDouble()*sum;
+		double sum_score = 0.0d;
+		for(int edge=0;edge<my_scores.length;edge++) {
+			sum_score+=my_scores[edge];
+			if(sum_score>=diced_score) {
+				return edge;
+			}
+		}
+		System.err.println("sample(double) should never come to here");
+		return -1;
+	}
+	
+	
+	public static Graph m_part(Graph g, final double all_epsilon, final double epsilon_q1) {
+		String name = "m_part() e="+all_epsilon+" e_1="+epsilon_q1;
+		System.out.println(name);
+		double start = System.currentTimeMillis();
+		Random rand = new Random(Util.seed);
+		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
+		
+		//distribute budget
+		final double epsilon_q2 = all_epsilon-epsilon_q1;
+		
+		@SuppressWarnings("unchecked")
+		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
+		int num_rr_falbacks = 0;
+		
+		double sum_error_expected = 0;
+		double sum_error_observed = 0;
+		
+		//boolean[] duplicate_check = new boolean[g.num_vertices];
+		
+		for(int node=0;node<g.num_vertices;node++) {
+			//Arrays.fill(duplicate_check, false);
+
+			//Execute Q1
+			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, epsilon_q1);
+			
+			//Decide whether we use k-edge or fall back to randomized response
+			double error_rr = TheoreticalAnalysis.error_rr(sanitized_number_of_outgoing_egdes, epsilon_q2, g.num_vertices)[0];
+			double error_m_part_2 =-1;
+			//if(node == 322 && all_epsilon == 2) {
+				error_m_part_2 = TheoreticalAnalysis.error_m_part(sanitized_number_of_outgoing_egdes, epsilon_q1, epsilon_q2, g.num_vertices);//TODO	
+			//}
+			//double error_m_part = TheoreticalAnalysis.error_k_edge_random_part(sanitized_number_of_outgoing_egdes, all_epsilon)[0];//TODO
+			ArrayList<Integer> my_sanitized_neighbors;
+					
+			if(sanitized_number_of_outgoing_egdes<=0) {
+				my_sanitized_neighbors = new ArrayList<Integer>();
+			}else if(error_rr<error_m_part_2){
+				//rr-fallback
+				my_sanitized_neighbors = rr_fall_back(node, epsilon_to_p(epsilon_q2), neighbor_list, g, rand);
+				num_rr_falbacks++;
+				//System.out.println(error_rr+" vs. error_m_part="+error_m_part+" for e="+all_epsilon +" |N|="+neighbor_list[node].size()+" at vertex="+node+" num_rr_falbacks="+num_rr_falbacks);
+			}else{
 				//Partition and Shuffle the data
 				if(sanitized_number_of_outgoing_egdes>=g.num_vertices) {
 					System.err.println("sanitized_number_of_outgoing_egdes>=g.num_vertices");
@@ -397,15 +581,16 @@ public class Mechanism {
 				ArrayList<Integer> neighbors = neighbor_list[node];
 				Collections.shuffle(neighbors);
 				
-				
+				//Not all real edges necessarily get a partition. They don't get one iff sanitized_number_of_outgoing_egdes < neighbors.size()
+				//Therefore, we shuffled the edges above such that each of them a equally like get no partition, but they move to the pool of non-edges
 				ArrayList<Integer> my_neighbors = new ArrayList<Integer>();
 				for(int i=0;i<Math.min(sanitized_number_of_outgoing_egdes, neighbors.size());i++) {
-					my_neighbors.add(neighbors.get(i));//Trick. real edges may become fake ones
+					my_neighbors.add(neighbors.get(i));
 				}
 
 				boolean[] true_edges = new boolean[g.num_vertices];
-				for(int my_edge : my_neighbors) {
-					true_edges[my_edge] = true;// Note here I access the true data. Thus the partitioning scheme is not private
+				for(int my_edge : my_neighbors) {//Trick. real edges may become fake ones
+					true_edges[my_edge] = true;
 				}
 				ArrayList<Integer> fake_edges = new ArrayList<Integer>(g.num_vertices);
 				for(int target_vertex=0;target_vertex<g.num_vertices;target_vertex++) {
@@ -432,6 +617,7 @@ public class Mechanism {
 				}
 					
 				//TODO remove me
+				M_Part_Partition.rebalance_partitions(my_partitions, epsilon_q2);
 				M_Part_Partition.check_partitions(node, my_partitions, my_neighbors, fake_edges, g, neighbors);
 				final double probability = M_Part_Partition.get_p(my_partitions, epsilon_q2);
 				my_sanitized_neighbors = new ArrayList<Integer>();
@@ -442,7 +628,14 @@ public class Mechanism {
 					}
 					my_sanitized_neighbors.add(neighbor_s);
 				}
-			
+				
+				int[] local_error = Metrics.edge_edit_dist(neighbors, my_sanitized_neighbors, g.num_vertices);
+				double wrong = local_error[Metrics.missing_edge]+local_error[Metrics.new_fake_edge];
+				/*if(Math.abs(error_m_part_2-wrong)>10.0d) {
+					System.out.println("id="+node+" Expecting\t"+error_m_part_2+"\tgot\t"+(wrong)+"\terror_rr=\t"+error_rr+"\t"+Arrays.toString(local_error)+"\t|N|="+neighbors.size());	
+				}*/
+				sum_error_expected += error_m_part_2;
+				sum_error_observed += wrong;
 			}
 			
 			sanitized_neighbor_list[node] = my_sanitized_neighbors;
@@ -451,6 +644,7 @@ public class Mechanism {
 				System.out.println("node="+node);
 			}
 		}
+		System.out.println("sum_error_expected="+sum_error_expected+" sum_error_observed="+sum_error_observed+" |G|="+g.num_vertices);
 		Graph.stop(start, "m_part()");
 		return new Graph(sanitized_neighbor_list, g.name+" "+name);
 	}
@@ -1010,6 +1204,16 @@ public class Mechanism {
 			probabilites[i] = ((double)noissy_u[i]) / sum;
 		}
 		return probabilites;
+	}
+	
+	public static void to_probabilities(double[] array) {
+		double sum = 0.0d;
+		for(double d: array) {
+			sum += (double)d;
+		}
+		for(int i=0;i<array.length;i++) {
+			array[i] /= sum;
+		}
 	}
 	
 	/**
