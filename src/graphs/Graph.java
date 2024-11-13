@@ -124,10 +124,13 @@ public class Graph {
 	}
 	
 	public boolean[][] get_adjancency_matrix_as_bit_vector(){
+		boolean reported_duplicate_edge = false;
+		
 		boolean[][] neighbors = new boolean[this.num_vertices][this.num_vertices];
 		for(Edge e : edges) {
-			if(neighbors[e.from][e.to] == true) {
+			if(!reported_duplicate_edge && neighbors[e.from][e.to] == true) {
 				System.err.println("get_adjancency_matrix_as_bit_vector(): Duplicate edge "+e);
+				reported_duplicate_edge = true; // Output the error only once
 			}
 			neighbors[e.from][e.to] = true;
 		}

@@ -1,7 +1,7 @@
 package misc;
 
 public class Util {
-	public static long seed = 1234567;
+	public static long seed = 123456;
 	public static double sum(final int[] arr) {
 		int sum = 0;
 		for(int v : arr) {

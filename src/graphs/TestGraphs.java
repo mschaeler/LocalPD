@@ -107,6 +107,9 @@ public class TestGraphs {
 	static final int M_PART				= 11;
 	static final int M_SAMPLE			= 12;
 	static final int M_SAMPLE_WEIGHTED  = 13;
+	static final int M_PART_2			= 14;
+	static final int M_NAIVE			= 15;
+	static final int M_PART_NO_SEQ		= 16;
 	
 
 	static double e_q1 = 1.0;
@@ -141,10 +144,16 @@ public class TestGraphs {
 			san_g = Mechanism.Chun_Lu_Model(g, epsilon, non_private, grouped);
 		}else if(mechanism==M_PART){
 			san_g = Mechanism.m_part(g, epsilon, e_q1);
+		}else if(mechanism==M_PART_2){
+			san_g = Mechanism.m_part_2(g, epsilon, e_q1);
 		}else if(mechanism==M_SAMPLE){
 			san_g = Mechanism.m_sample(g, epsilon, e_q1);
 		}else if(mechanism==M_SAMPLE_WEIGHTED){
 			san_g = Mechanism.m_sample_weighted(g, epsilon, e_q1);
+		}else if(mechanism==M_NAIVE){
+			san_g = Mechanism.m_straw_man(g, epsilon);
+		}else if(mechanism==M_PART_NO_SEQ){
+			san_g = Mechanism.m_part_no_seq(g, epsilon);
 		}else{
 			System.err.println("run() Unknown mechanism "+mechanism);
 			san_g = null;
@@ -177,10 +186,16 @@ public class TestGraphs {
 			return "TWO_K_SERIES";
 		}else if(mechanism==M_PART){
 			return "M_PART";
+		}else if(mechanism==M_PART_2){
+			return "M_PART_2";
 		}else if(mechanism==M_SAMPLE){
 			return "M_SAMPLE";
 		}else if(mechanism==M_SAMPLE_WEIGHTED){
 			return "M_SAMPLE_WEIGHTED";
+		}else if(mechanism==M_NAIVE){
+			return "M_NAIVE";
+		}else if(mechanism==M_PART_NO_SEQ){
+			return "M_PART_NO_SEQ";
 		}else{
 			System.err.println("name() Unknown mechanism "+mechanism);
 			return null;
@@ -409,23 +424,69 @@ public class TestGraphs {
 		count_triangles(graph_enum, all_m, all_e);
 	}
 
-	public static void main(String[] args) {
-		{
-			int[] graphs = {DataLoader.ADVOGATO};
-			//int[] mechanism = {K_EDGE_NON_PRIVATE, K_EDGE_SEQ_RR, K_EDGE_PART_RR, TOP_K, GUESS, RANDOM_RESPONSE};
-			int[] mechanism = {M_SAMPLE_WEIGHTED};
-			int num_repitions = 10;
-			double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-			//matrialize_private_graphs(graphs, mechanism, num_repitions, all_eps);	
+	public static void out_graph_statistics() {
+		int[] graph_enums = {DataLoader.CONGRESS_TWITTER, DataLoader.ADVOGATO, DataLoader.ENRON_SINGLE_EDGE};
+		
+		for(int grah_enum : graph_enums) {
+			Graph g = DataLoader.get_graph(grah_enum);
+			System.out.println("Graph enum "+grah_enum);
+			System.out.println(g.name+"\t"+g.num_vertices+"\t"+g.int_num_edges()+"\t"+((double)g.int_num_edges()/(double)g.num_vertices)+"\t"+Metrics.count_triangles(g));
 		}
-		//System.exit(0);
+		
+		
+	}
+	
+	public static void experiment_local_error() {
+		int[] all_mechanism = {M_NAIVE, M_PART_2, M_SAMPLE_WEIGHTED, RANDOM_RESPONSE, LDP_GEN, CHUN_LU, TWO_K_SERIES};
+		//int[] all_mechanism = {M_PART_2};
+		//int[] all_graphs = {DataLoader.CONGRESS_TWITTER, DataLoader.ADVOGATO, DataLoader.ENRON_SINGLE_EDGE};
+		int[] all_graphs = {DataLoader.ENRON_SINGLE_EDGE};
+		double[] all_epsilon = {1,2,3,4,5,6,7,8,9,10};
+		experiment_local_error(all_mechanism, all_epsilon, all_graphs);	
+	}
+	
+	private static void experiment_local_error(int[] all_mechanism, double[] all_epsilon, int[] all_graphs) {
+		experiment_local_error(get_mechanism_names(all_mechanism), all_epsilon, all_graphs);
+	}
+
+	static void experiment_local_error(String[] all_mechanism, double[] all_epsilon, int[] all_graphs) {
+		for(int graph_id  : all_graphs) {
+			System.out.println("Graph id="+graph_id+" "+DataLoader.get_graph_name(graph_id));
+			graph_statistics(graph_id, all_mechanism, all_epsilon);
+		}
+	}
+	
+	static String[] get_mechanism_names(int[] all_mechanism){
+		String[] names = new String[all_mechanism.length];
+		for(int i=0;i<all_mechanism.length;i++) {
+			names[i] = name(all_mechanism[i]);
+		}
+		return names;
+	}
+	
+	public static void matrialize_private_graphs(){
+		int[] graphs = {DataLoader.ENRON_SINGLE_EDGE};
+		//int[] mechanism = {K_EDGE_NON_PRIVATE, K_EDGE_SEQ_RR, K_EDGE_PART_RR, TOP_K, GUESS, RANDOM_RESPONSE};
+		//int[] mechanism = {M_PART_2};
+		int[] mechanism = {M_PART_2, M_SAMPLE_WEIGHTED, RANDOM_RESPONSE, LDP_GEN, CHUN_LU, TWO_K_SERIES};
+		int num_repitions = 10;
+		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
+		matrialize_private_graphs(graphs, mechanism, num_repitions, all_eps);
+	}
+	
+	public static void main(String[] args) {
+		//out_graph_statistics();
+		//experiment_local_error();	
+		matrialize_private_graphs();
+
+		System.exit(0);
 		//String[] all_mechanisms = {name(LDP_GEN), name(CHUN_LU), name(TWO_K_SERIES), name(M_PART)};
-		String[] all_mechanisms = {name(K_EDGE_NON_PRIVATE), name(M_SAMPLE_WEIGHTED)};
+		String[] all_mechanisms = {name(M_PART_NO_SEQ), name(M_PART), name(M_SAMPLE_WEIGHTED)};
 		//String[] all_mechanisms = {name(K_EDGE_NON_PRIVATE), name(K_EDGE_SEQ_RR), name(K_EDGE_PART_RR), name(TOP_K), name(GUESS), name(RANDOM_RESPONSE)};
 		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
-		graph_statistics(DataLoader.ADVOGATO, all_mechanisms, all_eps);
-		//count_triangles(DataLoader.ADVOGATO, all_mechanisms, all_eps);
-		//graph_proximity_prestige(DataLoader.CONGRESS_TWITTER, all_mechanisms, all_eps);
+		//graph_statistics(DataLoader.ADVOGATO, all_mechanisms, all_eps);
+		count_triangles(DataLoader.CONGRESS_TWITTER, all_mechanisms, all_eps);
+		//graph_proximity_prestige(DataLoader.ADVOGATO, all_mechanisms, all_eps);
 		System.exit(0);
 		//Config.USE_RESULT_STATISTICS = true;
 		ArrayList<MaterializedGraphs> mg_s = DataLoader.get_sanitized_graphs(DataLoader.ADVOGATO);

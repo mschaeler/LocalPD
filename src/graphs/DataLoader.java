@@ -55,6 +55,18 @@ public class DataLoader {
 		}
 	}
 	
+	public static String get_graph_name(int graph_id) {
+		if(graph_id==CONGRESS_TWITTER) {
+			return "CONGRESS_TWITTER";
+		}else if(graph_id==ADVOGATO){
+			return "ADVOGATO";
+		}else if(graph_id==ENRON_SINGLE_EDGE){
+			return "ENRON";
+		}else{
+			return "Unknown graph id="+graph_id;
+		}
+	}
+	
 	public static String get_synthetic_path(String graph_name) {
 		return "./data/synthetic/"+graph_name;
 	}
@@ -410,6 +422,8 @@ public class DataLoader {
 		}else if(mg.graph_name.equals(get_graph_name(2))) {
 			num_node = 75557;//Enron
 		}else if(mg.graph_name.equals(get_graph_name(3))) {
+			num_node = 475;//congress_twitter According to https://snap.stanford.edu/data/congress-twitter.html
+		}else if(mg.graph_name.equals(get_graph_name(3).toLowerCase())) {
 			num_node = 475;//congress_twitter According to https://snap.stanford.edu/data/congress-twitter.html
 		}else{
 			

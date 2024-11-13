@@ -162,15 +162,51 @@ public class TheoreticalAnalysis {
 		return delta_p;
 	}
 	
+	public static void probability_of_selecting_a_fake_node_m_part() {
+		//final int size_N = 1;
+		final int size_V = 100;
+		
+		for(int size_N = 0;size_N<size_V/2;size_N++) {
+			System.out.print("N="+size_N+"\t");
+			for(int c_s=0;c_s<size_V/2;c_s++) {
+				double cummulated_prob_not_e_i = get_probability_of_selecting_a_fake_node_m_part(size_V, size_N, c_s);
+				System.out.print(1.0d-cummulated_prob_not_e_i+"\t");
+			}
+			
+			System.out.println();
+		}
+		
+	}
+	
+	static double get_probability_of_selecting_a_fake_node_m_part(int size_V, int size_N){
+		return get_probability_of_selecting_a_fake_node_m_part(size_V, size_N, size_N);
+	}
+	
+	public static double get_probability_of_selecting_a_fake_node_m_part(int size_V, int size_N, int c_s){
+		if(size_V<=0 || size_N<-1 || c_s<=0) {
+			System.err.println("get_probability_of_selecting_a_fake_node_m_part() size_V<=0 || size_N<0 || c_s<=0");
+		}
+		final int size_N_f = size_V - size_N;
+		double cummulated_prob_not_e_i  =1.0d; //neutral element
+		for(int i=0;i<c_s;i++) {
+			final double curent_size_n_f = size_N_f-i;
+			double prob_not_e_i = 1.0d-(1.0d/curent_size_n_f);
+			//System.out.println("i="+i+" "+prob_not_e_i);
+			cummulated_prob_not_e_i *= prob_not_e_i;
+			//System.out.println("cum i="+i+" "+cummulated_prob_not_e_i);
+		}
+		return cummulated_prob_not_e_i;
+	}
 	
 	public static void main(String[] args) {
 		//error_rr();
 		//error_k_edge_non_private();
 		//error_k_edge_seq_comp();
 		//error_k_edge_random_part();
-		to_delta_pr(1, 1, 1);
-		to_delta_pr(1, 2, 1);
-		to_delta_pr(1, 2, 2);
+		//to_delta_pr(1, 1, 1);
+		//to_delta_pr(1, 2, 1);
+		//to_delta_pr(1, 2, 2);
+		probability_of_selecting_a_fake_node_m_part();
 	}
 	public static double error_m_part(double c_s, double epsilon_q1, double epsilon_q2, double num_vertices) {
 		double error = 1.0d / epsilon_q1; // Error from q1
