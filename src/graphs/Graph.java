@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 
 public class Graph {
+	public static PrintWriter print_writer;
+	public static final String delimiter = " ";
 	int id_e = 0;
 	public final String name;
 	
@@ -197,7 +199,23 @@ public class Graph {
 	}
 	
 	public String to_edge_list() {
-		return to_edge_list(" ");//Default delimiter is a space
+		return to_edge_list(delimiter);//Default delimiter is a space
+	}
+	public String to_edge_list(final int from, final boolean[] adjacency_matrix_line, String delimiter) {
+		StringBuffer sb = new StringBuffer(adjacency_matrix_line.length*20);
+		if(adjacency_matrix_line.length!=this.num_vertices) {
+			System.err.println("to_edge_list(int, bool[]) adjacency_matrix_line.length!=this.num_vertices");
+		}
+		for(int to=0;to<adjacency_matrix_line.length;to++) {
+			if(adjacency_matrix_line[to]) {
+				sb.append(from+delimiter+to+"\n");	
+			}
+		}
+		if(sb.length()!=0) {
+			return sb.toString();	
+		}else{
+			return null;
+		}	
 	}
 	public String to_edge_list(String delimiter) {
 		StringBuffer sb = new StringBuffer(10000);
@@ -238,5 +256,15 @@ public class Graph {
 	 */
 	public ArrayList<Edge> get_edges(){
 		return this.edges;
+	}
+
+	public static void write_edge(int node, int target_node) {
+		Graph.print_writer.println(node+delimiter+target_node);
+	}
+
+	public static void write_edge_list(final int node, ArrayList<Integer> my_sanitized_neighbors) {
+		for(int target : my_sanitized_neighbors) {
+			write_edge(node, target);//TODO efficient?
+		}
 	}
 }

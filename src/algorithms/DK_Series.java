@@ -11,6 +11,7 @@ import graphs.Graph;
 import graphs.Graph.Edge;
 import graphs.Mechanism;
 import misc.Util;
+import results.Config;
 
 public class DK_Series {
 	static final int NO_MORE_STUBS = -1;
@@ -149,10 +150,18 @@ public class DK_Series {
 					int w_global = global_vertex_id(j, w);
 					
 					if(!adjaency_matrix[v_global][w_global]){
-						g.add_edge(v_global, w_global);
+						if(Config.materialize_graph) {
+							Graph.write_edge(v_global, w_global);
+						}else{
+							g.add_edge(v_global, w_global);	
+						}
 						adjaency_matrix[v_global][w_global] = true;
 					}else if(!adjaency_matrix[w_global][v_global]){
-						g.add_edge(w_global, v_global);
+						if(Config.materialize_graph) {
+							Graph.write_edge(w_global, v_global);
+						}else{
+							g.add_edge(w_global, v_global);	
+						}
 						adjaency_matrix[w_global][v_global] = true;
 					}else{
 						if(counter<100) {
@@ -169,7 +178,11 @@ public class DK_Series {
 					reconstruction_jdm[column][line]++;
 				}
 			}	
+			if(line%1000==0) {
+				System.out.print("node="+line+" ");
+			}
 		}
+		System.out.println();
 		return g;
 	}
 	

@@ -3,13 +3,10 @@ package graphs;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map.Entry;
 
 import algorithms.PageRank;
 import algorithms.ProximityPrestige;
-import algorithms.ProximityPrestige.InfDom;
-import results.ResultCollector;
 
 public class Metrics {
 	public static final int correct_edge 		= 0;
@@ -61,8 +58,8 @@ public class Metrics {
 		return error;
 	}
 	
-	public static final double[] avg_edge_edit_dist(Graph original_g, ArrayList<Graph> sanitized_gs) {
-		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
+	public static final double[] avg_edge_edit_dist(final boolean[][] ground_truth, final int num_vertices, ArrayList<Graph> sanitized_gs) {
+		 
 		ArrayList<double[]> all_sums = new ArrayList<double[]>();
 		
 		for(int i=0;i<sanitized_gs.size();i++) {
@@ -78,10 +75,10 @@ public class Metrics {
 				sum[correct_none_edge]+= r[correct_none_edge];
 			}
 			
-			sum[correct_edge]/= original_g.num_vertices;
-			sum[missing_edge]/= original_g.num_vertices;
-			sum[new_fake_edge]/= original_g.num_vertices;
-			sum[correct_none_edge]/= original_g.num_vertices;
+			sum[correct_edge]/= 	num_vertices;
+			sum[missing_edge]/= 	num_vertices;
+			sum[new_fake_edge]/= 	num_vertices;
+			sum[correct_none_edge]/=num_vertices;
 			all_sums.add(sum);
 		}
 
@@ -235,10 +232,6 @@ public class Metrics {
 	public static final double page_rank(final Graph g) {
 		final double[] page_rank = PageRank.run(g);
 		double avg_page_rank = avg(page_rank);
-		ResultCollector.all_page_rank.add(avg_page_rank);
-		String name = "org g";
-		double[] all_eps = {-1};
-		ResultCollector.store(name, all_eps);
 		return avg_page_rank;
 	}
 	public static final double[] page_rank(final ArrayList<Graph> all_g) {
@@ -289,14 +282,8 @@ public class Metrics {
 	 * returns average proximity prestige delta for each sanitized_gs to original_g
 	 */
 	public static final double[] proximity_prestige(final Graph original_g) {
-		ResultCollector.init();
 		final double[][] pp_org = ProximityPrestige.run(original_g);
-		final double[] result = avg(pp_org);
-		ResultCollector.all_proximity_prestige.add(result);
-		String name = "org g";
-		double[] all_eps = {-1};
-		ResultCollector.store(name, all_eps);
-		
+		final double[] result = avg(pp_org);		
 		return result;
 	}
 	

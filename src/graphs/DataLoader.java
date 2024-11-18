@@ -105,7 +105,7 @@ public class DataLoader {
 		}else if(id==ENRON_MULTI_EDGE) {
 			return "ENRON_MULTI_EDGE".toLowerCase();
 		}else if(id==ENRON_SINGLE_EDGE) {
-			return "ENRON_SINGLE_EDGE".toLowerCase();
+			return "ENRON".toLowerCase();
 		}else if(id==CONGRESS_TWITTER) {
 			return "CONGRESS_TWITTER".toLowerCase();
 		}else{
@@ -419,7 +419,7 @@ public class DataLoader {
 		int num_node = -1;
 		if(mg.graph_name.equals(get_graph_name(0))) {
 			num_node = 6541;//Advogato
-		}else if(mg.graph_name.equals(get_graph_name(2))) {
+		}else if(mg.graph_name.equals(get_graph_name(2).toLowerCase())) {
 			num_node = 75557;//Enron
 		}else if(mg.graph_name.equals(get_graph_name(3))) {
 			num_node = 475;//congress_twitter According to https://snap.stanford.edu/data/congress-twitter.html

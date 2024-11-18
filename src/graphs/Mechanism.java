@@ -35,7 +35,7 @@ public class Mechanism {
 	 * @return
 	 */
 	public static Graph radomized_response(Graph g, final double epsilon) {
-		System.out.println("radomized_response()");
+		System.out.println("radomized_response()"+(Config.materialize_graph ? " materialize_graph" : ""));
 		double start = System.currentTimeMillis();
 		
 		final double p = epsilon_to_p(epsilon);
@@ -58,14 +58,20 @@ public class Mechanism {
 				}else {//else flip the bit
 					sanitized_adjacency_matrix_line[target_node] = (adjacency_matrix_line[target_node]) ? false : true;
 				}
-				if(sanitized_adjacency_matrix_line[target_node]) {
-					private_g.add_edge(node, target_node);
+				if(sanitized_adjacency_matrix_line[target_node]){
+					if(Config.materialize_graph) {
+						Graph.write_edge(node, target_node);
+					}else{
+						private_g.add_edge(node, target_node);
+					}
 				}
 			}
-			if(node%10000==0) {
-				System.out.println("node="+node);
+				
+			if(node%1000==0) {
+				System.out.print("node="+node+" ");
 			}
 		}
+		System.out.println();
 		Graph.stop(start, "radomized_response()");
 		
 		return private_g;
@@ -84,7 +90,7 @@ public class Mechanism {
 	 * @param p
 	 * @return
 	 */
-	public static Graph k_edge_radomized_response_non_private_grouping(Graph g, final double all_epsilon, final double epsilon_q1, boolean use_seq_composition) {
+	static Graph k_edge_radomized_response_non_private_grouping(Graph g, final double all_epsilon, final double epsilon_q1, boolean use_seq_composition) {
 		String name = "k_edge_radomized_response_non_private_grouping() use_seq_composition="+use_seq_composition;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
@@ -138,7 +144,7 @@ public class Mechanism {
 		return new Graph(sanitized_neighbor_list,g.name+" k_edge_radomized_response_non_private_grouping() use_seq_composition="+use_seq_composition);
 	}
 	
-	public static Graph k_edge_radomized_response_non_private_grouping_rr_fallback(Graph g, final double all_epsilon, final double epsilon_q1, boolean use_seq_composition) {
+	static Graph k_edge_radomized_response_non_private_grouping_rr_fallback(Graph g, final double all_epsilon, final double epsilon_q1, boolean use_seq_composition) {
 		String name = "k_edge_radomized_response_non_private_grouping_rr_fallback() use_seq_composition="+use_seq_composition;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
@@ -227,7 +233,7 @@ public class Mechanism {
 		return new Graph(sanitized_neighbor_list,g.name+" k_edge_radomized_response_non_private_grouping() use_seq_composition="+use_seq_composition);
 	}
 
-	public static ArrayList<Integer> rr_fall_back(final int node, final double p, ArrayList<Integer>[] neighbor_list, Graph g, Random rand) {
+	static ArrayList<Integer> rr_fall_back(final int node, final double p, ArrayList<Integer>[] neighbor_list, Graph g, Random rand) {
 		//System.out.println("Fall back");
 		final boolean[] adjacency_matrix_line = new boolean[g.num_vertices];
 		final boolean[] sanitized_adjacency_matrix_line = new boolean[g.num_vertices];
@@ -265,10 +271,10 @@ public class Mechanism {
 		@SuppressWarnings("unchecked")
 		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
 		
-		boolean[] duplicate_check = new boolean[g.num_vertices];
+		//boolean[] duplicate_check = new boolean[g.num_vertices];
 		
 		for(int node=0;node<g.num_vertices;node++) {
-			Arrays.fill(duplicate_check, false);
+			//Arrays.fill(duplicate_check, false);
 
 			//Execute Q1
 			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
@@ -281,15 +287,22 @@ public class Mechanism {
 					my_sanitized_neighbors.add(rand.nextInt(g.num_vertices));
 				}
 			}
+			if(Config.materialize_graph) {
+				Graph.write_edge_list(node, my_sanitized_neighbors);
+			}else{
+				sanitized_neighbor_list[node] = my_sanitized_neighbors;	
+			}
 			
-			sanitized_neighbor_list[node] = my_sanitized_neighbors;
-			
-			if(node%10000==0) {
-				System.out.println("node="+node);
+			if(node%1000==0) {
+				System.out.print("node="+node+" ");
 			}
 		}
 		Graph.stop(start, "m_straw_man()");
-		return new Graph(sanitized_neighbor_list, g.name+" "+name);
+		if(Config.materialize_graph) {
+			return null;
+		}else{
+			return new Graph(sanitized_neighbor_list, g.name+" "+name);	
+		}
 	}
 	
 	public static Graph m_sample(Graph g, final double all_epsilon, final double epsilon_q1) {
@@ -344,7 +357,15 @@ public class Mechanism {
 				}
 			}
 			
-			sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			if(Config.materialize_graph) {
+				Graph.write_edge_list(node, my_sanitized_neighbors);
+			}else {
+				sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			}
+			
+			if(node%1000==0) {
+				System.out.print("node="+node+" ");
+			}
 			
 			if(node%10000==0) {
 				System.out.println("node="+node);
@@ -436,15 +457,20 @@ public class Mechanism {
 				sum_error_observed += wrong;
 			}
 			
+			if(Config.materialize_graph) {
+				Graph.write_edge_list(node, my_sanitized_neighbors);
+			}else {
+				sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			}
 			
-			sanitized_neighbor_list[node] = my_sanitized_neighbors;
-			
-			if(node%10000==0) {
-				System.out.println("node="+node);
+			if(node%1000==0) {
+				System.out.print("node="+node+" ");
 			}
 		}
 		System.out.println("sum_error_expected="+sum_error_expected+" sum_error_observed="+sum_error_observed+" |G|="+g.num_vertices);
 		Graph.stop(start, "m_sample_weighted()");
+		if(Config.materialize_graph)
+			return null;
 		return new Graph(sanitized_neighbor_list, g.name+" "+name);
 	}
 	
@@ -543,17 +569,26 @@ public class Mechanism {
 				}
 			}
 			
-			sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			if(Config.materialize_graph) {
+				Graph.write_edge_list(node, my_sanitized_neighbors);
+			}else {
+				sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			}
 			
-			if(node%10000==0) {
-				System.out.println("node="+node);
+			if(node%1000==0) {
+				System.out.print("node="+node+" ");
 			}
 		}
+		System.out.println();
 		Graph.stop(start, "m_part_2()");
-		return new Graph(sanitized_neighbor_list, g.name+" "+name);
+		if(Config.materialize_graph) {
+			return null;
+		}else{
+			return new Graph(sanitized_neighbor_list, g.name+" "+name);	
+		}
 	}
 	
-	public static Graph m_part(Graph g, final double all_epsilon, final double epsilon_q1) {
+	static Graph m_part(Graph g, final double all_epsilon, final double epsilon_q1) {
 		String name = "m_part() e="+all_epsilon+" e_1="+epsilon_q1;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
@@ -669,7 +704,7 @@ public class Mechanism {
 		return new Graph(sanitized_neighbor_list, g.name+" "+name);
 	}
 	
-	public static Graph m_part_no_seq(Graph g, final double all_epsilon) {
+	static Graph m_part_no_seq(Graph g, final double all_epsilon) {
 		String name = "m_part_no_seq() e="+all_epsilon;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
@@ -677,10 +712,7 @@ public class Mechanism {
 		
 		@SuppressWarnings("unchecked")
 		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
-		
-		
-		
-		
+			
 		for(int node=0;node<g.num_vertices;node++) {
 			ArrayList<Integer> my_sanitized_neighbors = new ArrayList<Integer>();
 			ArrayList<Integer> neighbors = neighbor_list[node];		
@@ -737,8 +769,8 @@ public class Mechanism {
 	}
 	
 	
-	
-	public static Graph k_edge_radomized_response_partitioned(Graph g, final double all_epsilon, final double epsilon_q1, boolean rr_fall_back) {
+	@Deprecated
+	static Graph k_edge_radomized_response_partitioned(Graph g, final double all_epsilon, final double epsilon_q1, boolean rr_fall_back) {
 		String name = "k_edge_radomized_response_partitioned() e="+all_epsilon+" e_1="+epsilon_q1+" rr_fall_back="+rr_fall_back;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
@@ -1041,7 +1073,7 @@ public class Mechanism {
 	 * @param p
 	 * @return
 	 */
-	public static Graph top_k(Graph g, final double all_epsilon, final double epsilon_q1, boolean use_seq_composition) {
+	static Graph top_k(Graph g, final double all_epsilon, final double epsilon_q1, boolean use_seq_composition) {
 		String name = "top_k() use_seq_composition="+use_seq_composition;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
@@ -1144,7 +1176,7 @@ public class Mechanism {
 	 * @param p
 	 * @return
 	 */
-	public static Graph educated_guess(Graph g, final double all_epsilon, final boolean non_private) {
+	static Graph educated_guess(Graph g, final double all_epsilon, final boolean non_private) {
 		String name = "educated_guess()";
 		System.out.println(name);
 		double start = System.currentTimeMillis();
@@ -1207,7 +1239,7 @@ public class Mechanism {
 		return new Graph(sanitized_neighbor_list,g.name+" educated_guess()");
 	}
 	
-	public static double[] to_probabilities(int[] noissy_u) {
+	static double[] to_probabilities(int[] noissy_u) {
 		double sum = 0.0d;
 		for(double d: noissy_u) {
 			sum += (double)d;
@@ -1219,7 +1251,7 @@ public class Mechanism {
 		return probabilites;
 	}
 	
-	public static void to_probabilities(double[] array) {
+	static void to_probabilities(double[] array) {
 		double sum = 0.0d;
 		for(double d: array) {
 			sum += (double)d;
@@ -1373,43 +1405,6 @@ public class Mechanism {
 		//ldp_gen_phase_3(san_g, final_degree_estimations, k_1, xi_2);
 		create_vertices(san_g, final_degree_estimations, k_1, xi_2);
 		
-		/*Random rand = new Random(1234567);
-
-		double[] denom_2_all_j = new double[k_1];
-		for(double[] delta_v : final_degree_estimations) {//v \in G
-			add(denom_2_all_j, delta_v);
-		}
-		//It is a bid hard to understand in the paper, but many infos required to compute the probability are partition depended, only.
-		for(int i = 0; i < k_1; i++) {//For each partition i
-			double[] denom_1_all_j = new double[k_1];
-			final ArrayList<Integer> U_i = xi_2.getCluster(i);
-			for(int u : U_i){
-				add(denom_1_all_j, final_degree_estimations[u]);
-			}
-			for(int u : U_i) {//For each Node u in U_i
-				final double[] delta_u = final_degree_estimations[u];//This is the node-specific part required to compute the probability
-
-				for(int j = 0; j < k_1; j++) {
-					final ArrayList<Integer> U_j = xi_2.getCluster(j);
-					final double denom = denom_1_all_j[j] + denom_2_all_j[j];
-					final double const_nominator = denom_2_all_j[j]/(double)U_j.size();
-					//compute probability of an edge to a node in this partition
-					double p = delta_u[j]*const_nominator/denom;
-					if(p>1.0) {
-						System.err.println("p>1.0 p="+p);
-						p=1.0d;
-					}
-					
-					for(int v : U_j) {
-						double dice = rand.nextDouble();
-						if(dice<p) {
-							san_g.add_edge(u, v);
-						}
-					}				
-				}
-			}
-		}
-		*/
 		Graph.stop(start, name);
 		return san_g;
 	}
@@ -1443,7 +1438,11 @@ public class Mechanism {
 						my_neighbors.add(U_j.get(index));//avoids duplicate edges
 					}
 					for(Integer v : my_neighbors) {
-						san_g.add_edge(u, v);
+						if(Config.materialize_graph) {
+							Graph.write_edge(u, v);
+						}else{
+							san_g.add_edge(u, v);	
+						}
 					}
 				}
 			}
@@ -1623,8 +1622,8 @@ public class Mechanism {
 		return sum;
 	}
 	
-	public static Graph Chun_Lu_Model(Graph g, final double epsilon, final boolean none_private, final boolean partioned) {
-		String name = "Chun_Lu";
+	public static Graph Chung_Lu_Model(Graph g, final double epsilon, final boolean none_private, final boolean partioned) {
+		String name = "Chung_Lu e="+epsilon;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
 		
@@ -1703,21 +1702,26 @@ public class Mechanism {
 				for(int v=0;v<g.num_vertices;v++) {
 					double p = weights[u] * weights[v] / sum_weights;
 					if(p>1.0) {
-						System.err.println("p>1.0 p="+p);
+						//System.err.println("p>1.0 p="+p);
 						p=1.0d;
 					}
 					double dice = rand.nextDouble();
 					if(dice<p) {
-						san_g.add_edge(u, v);
+						if(Config.materialize_graph) {
+							Graph.write_edge(u, v);
+						}else{
+							san_g.add_edge(u, v);	
+						}
 					}
 				}
+				if(u%1000==0) {
+					System.out.print("node="+u+" ");
+				}
 			}
+			System.out.println();
 		}
-		
 		
 		Graph.stop(start, name);
 		return san_g;
 	}
-
-
 }
