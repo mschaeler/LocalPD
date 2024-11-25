@@ -8,7 +8,7 @@ import misc.Util;
 
 public class Sample {
 	static double SCORE_EXISTING_EDGE 	= 1;
-	static double SCORE_NON_EDGE 		= 0;
+	static double SCORE_NONE_EDGE 		= 0;
 	
 	final double my_scores[];
 	HashSet<Integer> index;
@@ -26,7 +26,7 @@ public class Sample {
 		if(index.contains(edge)) {
 			return SCORE_EXISTING_EDGE;
 		}else{
-			return SCORE_NON_EDGE;
+			return SCORE_NONE_EDGE;
 		}
 	}
 	
@@ -48,6 +48,6 @@ public class Sample {
 	}
 	
 	public static double delta_u() {
-		return SCORE_EXISTING_EDGE-SCORE_NON_EDGE;
+		return SCORE_EXISTING_EDGE-SCORE_NONE_EDGE;
 	}
 }

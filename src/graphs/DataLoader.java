@@ -22,8 +22,9 @@ public class DataLoader {
 	private static String data_file = "./data/enron-mysqldump.sql";
 	public static final int ADVOGATO 		  = 0;
 	public static final int ENRON_MULTI_EDGE  = 1;
-	public static final int ENRON_SINGLE_EDGE = 2;
+	public static final int ENRON_SINGLE_EDGE = 2;//https://snap.stanford.edu/data/congress-twitter.html
 	public static final int CONGRESS_TWITTER  = 3;
+	public static final int FACEBOOK		  = 4;//https://snap.stanford.edu/data/facebook-large-page-page-network.html
 	
 	private static HashMap<String, Integer> data_set_ids_by_name = new HashMap<String, Integer>(10);
 	static{
@@ -33,6 +34,8 @@ public class DataLoader {
 		data_set_ids_by_name.put("ENRON".toLowerCase(), ENRON_SINGLE_EDGE);
 		data_set_ids_by_name.put("CONGRESS", CONGRESS_TWITTER);
 		data_set_ids_by_name.put("CONGRESS".toLowerCase(), CONGRESS_TWITTER);
+		data_set_ids_by_name.put("FACEBOOK", FACEBOOK);
+		data_set_ids_by_name.put("FACEBOOK".toLowerCase(), FACEBOOK);
 	}
 	
 	public static Graph get_graph(String name){
@@ -45,10 +48,12 @@ public class DataLoader {
 		}else if(id==ENRON_MULTI_EDGE) {
 			return get_enron_graph();
 		}else if(id==ENRON_SINGLE_EDGE) {
-			Graph g = DataLoader.get_enron_single_edge_graph();
+			Graph g = get_enron_single_edge_graph();
 			return g;
 		}else if(id==CONGRESS_TWITTER) {
 			return get_congress_twitter_graph();
+		}else if(id==FACEBOOK) {
+			return get_facebook_graph();
 		}else{
 			System.err.println("get_graph("+id+") Unkown id");
 			return null;
@@ -62,6 +67,8 @@ public class DataLoader {
 			return "ADVOGATO";
 		}else if(graph_id==ENRON_SINGLE_EDGE){
 			return "ENRON";
+		}else if(graph_id==FACEBOOK){
+			return "FACEBOOK";
 		}else{
 			return "Unknown graph id="+graph_id;
 		}
@@ -108,6 +115,8 @@ public class DataLoader {
 			return "ENRON".toLowerCase();
 		}else if(id==CONGRESS_TWITTER) {
 			return "CONGRESS_TWITTER".toLowerCase();
+		}else if(id==FACEBOOK) {
+			return "FACEBOOK".toLowerCase();
 		}else{
 			System.err.println("get_graph("+id+") Unkown id");
 			return null;
@@ -414,6 +423,11 @@ public class DataLoader {
 		final int num_node = 75557;
 		return get_graph_from_edge_list(ennon_single_edge, num_node);
 	}
+	private static String facebook = "./data/musae_facebook_edges.edgelist";
+	static Graph get_facebook_graph() {
+		final int num_node = 22470;//According to https://snap.stanford.edu/data/facebook-large-page-page-network.html
+		return get_graph_from_edge_list(facebook, num_node);
+	}
 	
 	public static Graph load(MaterializedGraphs mg) {
 		int num_node = -1;
@@ -425,6 +439,8 @@ public class DataLoader {
 			num_node = 475;//congress_twitter According to https://snap.stanford.edu/data/congress-twitter.html
 		}else if(mg.graph_name.equals(get_graph_name(3).toLowerCase())) {
 			num_node = 475;//congress_twitter According to https://snap.stanford.edu/data/congress-twitter.html
+		}else if(mg.graph_name.equals(get_graph_name(4).toLowerCase())) {
+			num_node = 22470;
 		}else{
 			
 		}

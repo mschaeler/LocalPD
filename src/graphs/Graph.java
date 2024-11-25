@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashSet;
 
 public class Graph {
@@ -125,16 +126,20 @@ public class Graph {
 		return edge_list;
 	}
 	
-	public boolean[][] get_adjancency_matrix_as_bit_vector(){
+	public BitSet[] get_adjancency_matrix_as_bit_vector(){
 		boolean reported_duplicate_edge = false;
 		
-		boolean[][] neighbors = new boolean[this.num_vertices][this.num_vertices];
+		BitSet[] neighbors = new BitSet[this.num_vertices];
+		for(int i=0;i<neighbors.length;i++) {
+			neighbors[i] = new BitSet(num_vertices);
+		}
+		
 		for(Edge e : edges) {
-			if(!reported_duplicate_edge && neighbors[e.from][e.to] == true) {
+			if(!reported_duplicate_edge && neighbors[e.from].get(e.to)) {
 				System.err.println("get_adjancency_matrix_as_bit_vector(): Duplicate edge "+e);
 				reported_duplicate_edge = true; // Output the error only once
 			}
-			neighbors[e.from][e.to] = true;
+			neighbors[e.from].set(e.to);
 		}
 		return neighbors;
 	}
@@ -266,5 +271,13 @@ public class Graph {
 		for(int target : my_sanitized_neighbors) {
 			write_edge(node, target);//TODO efficient?
 		}
+	}
+	
+	public int[] get_out_degree_per_vertex() {
+		int[] out_degrees = new int[num_vertices];
+		for(Edge e : this.edges) {
+			out_degrees[e.from]++;
+		}
+		return out_degrees;
 	}
 }

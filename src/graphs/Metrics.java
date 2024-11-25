@@ -2,6 +2,7 @@ package graphs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map.Entry;
 
@@ -58,14 +59,14 @@ public class Metrics {
 		return error;
 	}
 	
-	public static final double[] avg_edge_edit_dist(final boolean[][] ground_truth, final int num_vertices, ArrayList<Graph> sanitized_gs) {
+	public static final double[] avg_edge_edit_dist(final BitSet[] ground_truth, final int num_vertices, ArrayList<Graph> sanitized_gs) {
 		 
 		ArrayList<double[]> all_sums = new ArrayList<double[]>();
 		
 		for(int i=0;i<sanitized_gs.size();i++) {
 			double[] sum = new double[4];
 			Graph g = sanitized_gs.get(i);
-			final boolean[][] to_ceck = g.get_adjancency_matrix_as_bit_vector();
+			final BitSet[] to_ceck = g.get_adjancency_matrix_as_bit_vector();
 			final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 			
 			for(int[] r : result) {
@@ -98,8 +99,8 @@ public class Metrics {
 	}
 	
 	static final double mae(Graph original_g, Graph sanitized_g) {
-		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
-		final boolean[][] to_ceck = sanitized_g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] to_ceck = sanitized_g.get_adjancency_matrix_as_bit_vector();
 		final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 		
 		double sum = 0;
@@ -114,12 +115,12 @@ public class Metrics {
 	}
 	
 	static final double[] mae(Graph original_g, ArrayList<Graph> sanitized_gs) {
-		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
 		double[] all_mae = new double[original_g.num_vertices];
 		
 		for(int i=0;i<sanitized_gs.size();i++) {
 			Graph g = sanitized_gs.get(i);
-			final boolean[][] to_ceck = g.get_adjancency_matrix_as_bit_vector();
+			final BitSet[] to_ceck = g.get_adjancency_matrix_as_bit_vector();
 			final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 			
 			double sum = 0;
@@ -136,23 +137,23 @@ public class Metrics {
 	}
 	
 	/**
-	 * Computes for each vertice the number of correct, missing, fake, and correct-non-edges. I.e., the it return an array[|V|][4]
+	 * Computes for each vertex the number of correct, missing, fake, and correct-non-edges. I.e., the it return an array[|V|][4]
 	 * @param ground_truth
 	 * @param to_ceck
 	 * @return
 	 */
-	private static int[][] edge_edit_dist(final boolean[][] ground_truth, final boolean[][] to_ceck) {
+	private static int[][] edge_edit_dist(final BitSet[] ground_truth, final BitSet[] to_ceck) {
 		if(ground_truth.length!=to_ceck.length) {
 			System.err.println("node_edit_dist() ground_truth.length!=to_ceck.length");
 		}
 		final int[][] result = new int[ground_truth.length][4];
 		for(int node = 0;node<ground_truth.length;node++) {
 			for(int e = 0;e<ground_truth.length;e++) {
-				if(ground_truth[node][e] && to_ceck[node][e]) {
+				if(ground_truth[node].get(e) && to_ceck[node].get(e)) {
 					result[node][correct_edge]++;
-				}else if(ground_truth[node][e] && !to_ceck[node][e]){//there should be an edged, but there is none
+				}else if(ground_truth[node].get(e) && !to_ceck[node].get(e)){//there should be an edged, but there is none
 					result[node][missing_edge]++;
-				}else if(!ground_truth[node][e] && to_ceck[node][e]){//we invented a new edge
+				}else if(!ground_truth[node].get(e) && to_ceck[node].get(e)){//we invented a new edge
 					result[node][new_fake_edge]++;
 				}else{//in both cases there is no edge
 					result[node][correct_none_edge]++;
@@ -163,9 +164,9 @@ public class Metrics {
 	}
 
 	static final double mre(Graph original_g, Graph sanitized_g) {		
-		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
 		ArrayList<Integer>[] neighbors = original_g.get_neighbors();
-		final boolean[][] to_ceck = sanitized_g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] to_ceck = sanitized_g.get_adjancency_matrix_as_bit_vector();
 		final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 		
 		double sum = 0;
@@ -182,13 +183,13 @@ public class Metrics {
 	}
 	
 	static final double[] mre(Graph original_g, ArrayList<Graph> sanitized_gs) {
-		final boolean[][] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] ground_truth = original_g.get_adjancency_matrix_as_bit_vector();
 		ArrayList<Integer>[] neighbors = original_g.get_neighbors();
 		double[] all_mre = new double[original_g.num_vertices];
 		
 		for(int i=0;i<sanitized_gs.size();i++) {
 			Graph g = sanitized_gs.get(i);
-			final boolean[][] to_ceck = g.get_adjancency_matrix_as_bit_vector();
+			final BitSet[] to_ceck = g.get_adjancency_matrix_as_bit_vector();
 			final int[][] result = edge_edit_dist(ground_truth, to_ceck);
 			
 			double sum = 0;
@@ -243,50 +244,6 @@ public class Metrics {
 		return all_page_rank;
 	}
 
-	/**
-	 * returns average proximity prestige delta for each sanitized_gs to original_g
-	 */
-	public static final double[] proximity_prestige(final Graph original_g, final ArrayList<Graph> sanitized_gs) {
-		final double[][] pp_org = ProximityPrestige.run(original_g);
-		ArrayList<double[]> temp_results = new ArrayList<double[]>(sanitized_gs.size());
-		
-		for(int i=0;i<sanitized_gs.size();i++) {
-			final double[][] pp_san_i = ProximityPrestige.run(sanitized_gs.get(i));
-			double[] deltas = abs_avg_delta(pp_org, pp_san_i);//[I,avg dist(),pp]
-			temp_results.add(deltas);
-		}
-		
-		final double[] result = avg(temp_results);
-		
-		return result;
-	}
-	/**
-	 * returns average proximity per sanitized graph
-	 * [I,avg dist(),pp]
-	 */
-	public static final double[] proximity_prestige(final ArrayList<Graph> sanitized_gs) {
-		ArrayList<double[]> temp_results = new ArrayList<double[]>(sanitized_gs.size());
-		
-		for(int i=0;i<sanitized_gs.size();i++) {
-			final double[][] pp_san_i = ProximityPrestige.run(sanitized_gs.get(i));
-			double[] arr = avg(pp_san_i);//[I,avg dist(),pp]
-			temp_results.add(arr);
-		}
-		
-		final double[] result = avg(temp_results);
-		
-		return result;
-	}
-	
-	/**
-	 * returns average proximity prestige delta for each sanitized_gs to original_g
-	 */
-	public static final double[] proximity_prestige(final Graph original_g) {
-		final double[][] pp_org = ProximityPrestige.run(original_g);
-		final double[] result = avg(pp_org);		
-		return result;
-	}
-	
 	private static double[] avg(double[][] temp_results) {
 		int size = temp_results.length;
 		int width = temp_results[0].length;
@@ -406,13 +363,13 @@ public class Metrics {
 		/**
 		 * Adjacency matrix of g
 		 */
-		final boolean[][] am = g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] am = g.get_adjancency_matrix_as_bit_vector();
 		long count_triangles = 0;
 		for(int[] org_triangle : all_org_triangles) {
 			final int i = org_triangle[0];
 			final int j = org_triangle[1];
 			final int k = org_triangle[2];
-			if(am[i][j] && am[j][k] && am[k][i]) {
+			if(am[i].get(j) && am[j].get(k) && am[k].get(i)) {
 				count_triangles++;
 			}
 		}
@@ -421,20 +378,20 @@ public class Metrics {
 		return count_triangles;
 	}
 	
-	public static ArrayList<int[]> get_triangles(Graph g) {
+	private static ArrayList<int[]> get_triangles(Graph g) {
 		//System.out.println("count_triangles(Graph)");
 		double start = System.currentTimeMillis();
 		HashMap<Integer, ArrayList<int[]>> all_triangles = new HashMap<Integer, ArrayList<int[]>>();
 		/**
 		 * Adjacency matrix of g
 		 */
-		final boolean[][] am = g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] am = g.get_adjancency_matrix_as_bit_vector();
 		final int V = g.num_vertices;
 		for (int i = 0; i < V; i++) {
 			for (int j = 0; j < V; j++) {
-				if(am[i][j]) {
+				if(am[i].get(j)) {
 					for (int k = 0; k < V; k++) {
-						if (am[j][k] && am[k][i]) {// This is a triangle
+						if (am[j].get(k) && am[k].get(i)) {// This is a triangle
 							int[] triangle = {i,j,k};
 							Arrays.sort(triangle);
 							insert_if_not_contained(all_triangles, triangle);
@@ -485,14 +442,14 @@ public class Metrics {
 		/**
 		 * Adjacency matrix of g
 		 */
-		final boolean[][] am = g.get_adjancency_matrix_as_bit_vector();
+		final BitSet[] am = g.get_adjancency_matrix_as_bit_vector();
 		long count_triangles = 0;
 		final int V = g.num_vertices;
 		for (int i = 0; i < V; i++) {
 			for (int j = 0; j < V; j++) {
-				if(am[i][j]) {
+				if(am[i].get(j)) {
 					for (int k = 0; k < V; k++) {
-						if (am[j][k] && am[k][i]) {// This is a triangle
+						if (am[j].get(k) && am[k].get(i)) {// This is a triangle
 							count_triangles++;
 						}
 					}
@@ -504,5 +461,27 @@ public class Metrics {
 		count_triangles /= 3;
 		System.out.println("count_triangles(Graph) [Done] in " + (System.currentTimeMillis() - start) + " ms");
 		return count_triangles;
+	}
+	
+	public static double[] get_array_statistics(double expected_error, double[] observed_error) {
+		// The mean average
+		double mean = 0.0;
+		for (int i = 0; i < observed_error.length; i++) {
+		        mean += observed_error[i];
+		}
+		mean /= observed_error.length;
+
+		// The variance
+		double variance = 0;
+		for (int i = 0; i < observed_error.length; i++) {
+		    variance += Math.pow(observed_error[i] - mean, 2);
+		}
+		variance /= observed_error.length;
+
+		// Standard Deviation
+		double std = Math.sqrt(variance);
+		
+		double[] ret = {mean,variance,std}; 
+		return ret; 
 	}
 }

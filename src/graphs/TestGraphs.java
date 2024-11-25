@@ -4,14 +4,18 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
 
-import cern.colt.Arrays;
+import algorithms.ProximityPrestige;
+import algorithms.ProximityPrestige.InfDom;
+import misc.Histogram;
 import misc.Util;
 import results.*;
 
 
 public class TestGraphs {
-	static int num_repitions = 10;	
+	static int num_repitions = Config.num_repitions;	
 	
 	public static final int RANDOM_RESPONSE 	= 0;
 	public static final int K_EDGE_NON_PRIVATE 	= 1;
@@ -30,6 +34,8 @@ public class TestGraphs {
 	public static final int M_PART_2			= 14;
 	public static final int M_NAIVE				= 15;
 	public static final int M_PART_NO_SEQ		= 16;
+	public static final int M_SAMPLE_NO_RR		= 17;
+	public static final int M_SAMPLE_WEIGHTED_NO_RR = 18;
 	
 	static double e_q1 = 1.0;
 	
@@ -66,13 +72,21 @@ public class TestGraphs {
 		}else if(mechanism==M_PART_2){
 			san_g = Mechanism.m_part_2(g, epsilon, e_q1);
 		}else if(mechanism==M_SAMPLE){
-			san_g = Mechanism.m_sample(g, epsilon, e_q1);
+			boolean no_rr_fall_back = false;
+			san_g = Mechanism.m_sample(g, epsilon, e_q1, no_rr_fall_back);
 		}else if(mechanism==M_SAMPLE_WEIGHTED){
-			san_g = Mechanism.m_sample_weighted(g, epsilon, e_q1);
+			boolean no_rr_fall_back = false;
+			san_g = Mechanism.m_sample_weighted(g, epsilon, e_q1, no_rr_fall_back);
 		}else if(mechanism==M_NAIVE){
 			san_g = Mechanism.m_straw_man(g, epsilon);
 		}else if(mechanism==M_PART_NO_SEQ){
 			san_g = Mechanism.m_part_no_seq(g, epsilon);
+		}else if(mechanism==M_SAMPLE_NO_RR){
+			boolean no_rr_fall_back = true;
+			san_g = Mechanism.m_sample(g, epsilon, e_q1, no_rr_fall_back);
+		}else if(mechanism==M_SAMPLE_WEIGHTED_NO_RR){
+			boolean no_rr_fall_back = true;
+			san_g = Mechanism.m_sample_weighted(g, epsilon, e_q1, no_rr_fall_back);
 		}else{
 			System.err.println("run() Unknown mechanism "+mechanism);
 			san_g = null;
@@ -115,6 +129,10 @@ public class TestGraphs {
 			return "M_NAIVE";
 		}else if(mechanism==M_PART_NO_SEQ){
 			return "M_PART_NO_SEQ";
+		}else if(mechanism==M_SAMPLE_NO_RR){
+			return "M_SAMPLE_NO_RR";
+		}else if(mechanism==M_SAMPLE_WEIGHTED_NO_RR){
+			return "M_SAMPLE_WEIGHTED_NO_RR";
 		}else{
 			System.err.println("name() Unknown mechanism "+mechanism);
 			return null;
@@ -152,7 +170,7 @@ public class TestGraphs {
 	private static void graph_statistics(int graph_enum, String[] all_m, double[] all_e) {
 		System.out.println("***graph_statistics("+DataLoader.get_graph_name(graph_enum)+") " + Arrays.toString(all_m)+" "+Arrays.toString(all_e));
 		Graph g = DataLoader.get_graph(graph_enum);
-		boolean[][] ground_truth = g.get_adjancency_matrix_as_bit_vector();
+		BitSet[] ground_truth = g.get_adjancency_matrix_as_bit_vector();
 		ArrayList<MaterializedGraphs> mg_s = DataLoader.get_sanitized_graphs(graph_enum);
 		if(mg_s.isEmpty()) {
 			System.err.println("graph_statistics() graph enum resutled in no graphs "+graph_enum);
@@ -298,15 +316,149 @@ public class TestGraphs {
 		//int[] mechanism = {M_PART_2};
 		int[] mechanism = Config.mechanism;
 		int num_repitions = TestGraphs.num_repitions;
-		double[] all_eps = {1,2,3,4,5,6,7,8,9,10};
+		double[] all_eps = Config.all_eps;
 		matrialize_private_graphs(graphs, mechanism, num_repitions, all_eps);
 	}
 	
 	public static void main(String[] args) {
+		matrialize_private_graphs();
 		//out_graph_statistics();
-		//experiment_local_error();	
-		experiment_triangle_error();
-		//matrialize_private_graphs();
+		experiment_local_error();	
+		//experiment_degree_distribution();
+		//experiment_triangle_error();
+		//int k= 10; experiment_inf_dom(k);
 	}
 
+	public static void experiment_inf_dom(int k) {//TODO k
+		int[] all_mechanism = Config.mechanism;
+		int[] all_graphs 	= Config.graphs;
+		double[] all_epsilon= Config.all_eps;
+		
+		experiment_inf_dom(all_graphs, get_mechanism_names(all_mechanism), all_epsilon);
+	}
+
+	private static void experiment_inf_dom(int[] all_graphs, String[] all_mechanism, double[] all_epsilon) {
+		for(int graph_enum : all_graphs) {
+			experiment_inf_dom(graph_enum, all_mechanism, all_epsilon);
+		}
+	}
+
+	private static void experiment_inf_dom(int graph_enum, String[] all_m, double[] all_e) {
+		System.out.println("***experiment_inf_dom("+DataLoader.get_graph_name(graph_enum)+") " + Arrays.toString(all_m)+" "+Arrays.toString(all_e));
+		Graph g = DataLoader.get_graph(graph_enum);
+		String path = "./data/inf_dom/"+DataLoader.get_graph_name(graph_enum);
+		
+		File folder = new File(path);
+		if(!folder.exists()) {
+			folder.mkdirs();
+		}
+		
+		try (PrintWriter out = new PrintWriter(path+"/org_g.tsv")) {
+			String header = "id\t|inf_dom|\tlength_path\tpp"; 
+			//System.out.println(header);
+			out.println(header);
+			InfDom[] inf_doms = ProximityPrestige.run(g);
+			for(InfDom i_d : inf_doms) {
+				//System.out.println(i_d);
+				out.println(i_d.toString());
+			}
+			Graph.print_writer = null;
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		
+		ArrayList<MaterializedGraphs> mg_s = DataLoader.get_sanitized_graphs(graph_enum);
+		
+		for(String m : all_m) {
+			System.out.println(m);
+			ArrayList<MaterializedGraphs> graphs_of_mechanism = MaterializedGraphs.filter_by_mechanism(mg_s, m);
+
+			for(double epsilon : all_e) {
+				System.out.println(epsilon);
+				ArrayList<MaterializedGraphs> temp = MaterializedGraphs.filter_by_epsilon(graphs_of_mechanism, epsilon);
+				ArrayList<Graph> g_s = DataLoader.get_sanitized_graphs(temp);
+				
+				for(int i=0;i<g_s.size();i++) {
+					Graph san_g = g_s.get(i);
+					try (PrintWriter out = new PrintWriter(path+"/"+m+"-"+epsilon+"-"+i+".tsv")) {
+						String header = "id\t|inf_dom|\tlength_path\tpp"; 
+						//System.out.println(header);
+						out.println(header);
+						InfDom[] inf_doms = ProximityPrestige.run(san_g);
+						for(InfDom i_d : inf_doms) {
+							//System.out.println(i_d);
+							out.println(i_d.toString());
+						}
+						Graph.print_writer = null;
+					} catch (FileNotFoundException e) {
+						e.printStackTrace();
+					}
+				}
+				
+				
+			}
+		}
+	}
+
+	public static void experiment_degree_distribution() {
+		int[] all_mechanism = Config.mechanism;
+		int[] all_graphs 	= Config.graphs;
+		double[] all_epsilon= Config.all_eps;
+		experiment_degree_distribution(all_graphs, get_mechanism_names(all_mechanism), all_epsilon);
+	}
+
+	private static void experiment_degree_distribution(int[] all_graphs, String[] all_mechanism, double[] all_epsilon) {
+		for(int graph_enum : all_graphs) {
+			experiment_degree_distribution(graph_enum, all_mechanism, all_epsilon);
+		}
+	}
+
+	private static void experiment_degree_distribution(int graph_enum, String[] all_m, double[] all_e) {
+		System.out.println("***experiment_degree_distribution("+DataLoader.get_graph_name(graph_enum)+") " + Arrays.toString(all_m)+" "+Arrays.toString(all_e));
+		Graph g = DataLoader.get_graph(graph_enum);
+		final int[] org_graph_degrees = g.get_out_degree_per_vertex();
+		Arrays.sort(org_graph_degrees);
+		Histogram hist = new Histogram(org_graph_degrees, 20);
+		System.out.println(hist);
+		
+		ArrayList<MaterializedGraphs> mg_s = DataLoader.get_sanitized_graphs(graph_enum);
+		ArrayList<ArrayList<Histogram>> all_results = new ArrayList<ArrayList<Histogram>>();
+		for(String approach : all_m) {
+			System.out.println(approach);
+			ArrayList<MaterializedGraphs> graphs_of_mechanism = MaterializedGraphs.filter_by_mechanism(mg_s, approach);
+			ArrayList<Histogram> out = new ArrayList<Histogram>();
+			for(double epsilon : all_e) {
+				System.out.println(epsilon);
+				ArrayList<MaterializedGraphs> temp = MaterializedGraphs.filter_by_epsilon(graphs_of_mechanism, epsilon);
+				ArrayList<Graph> g_s = DataLoader.get_sanitized_graphs(temp);
+				
+				Histogram hist_san = new Histogram(hist);
+				for(Graph san_g : g_s) {
+					hist_san.add_all(san_g.get_out_degree_per_vertex());
+				}
+				out.add(hist_san);
+				
+			}
+			System.out.println(approach);
+			for(Histogram h : out) {
+				System.out.println(h);
+			}
+			all_results.add(out);
+		}
+		/*String header = "eps\tOriginal\t";
+		for(String approach : all_m) {
+			header+=approach+"\t";
+		}
+		System.out.println(g.name);
+		System.out.println(header);
+		int num_lines = all_results.get(0).size();
+		for(int line=0;line<num_lines;line++) {
+			System.out.print(all_results.get(0).get(line)[0]+"\t");
+			System.out.print(all_results.get(0).get(line)[1]+"\t");
+			for(ArrayList<String[]> r : all_results) {
+				System.out.print(r.get(line)[2]+"\t");
+			}
+			System.out.println();
+		}*/
+	}
 }

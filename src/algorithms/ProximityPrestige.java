@@ -8,7 +8,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import graphs.DataLoader;
 import graphs.Graph;
+import results.Config;
 
 public class ProximityPrestige {
 	Graph g;
@@ -49,6 +51,9 @@ public class ProximityPrestige {
 	
 	void wrapper(final int node){
 		influence_domains[node] = new InfDom(get_influence_domain_v02(node), node);
+		if(node%1000==0) {
+			System.out.println(node);
+		}
 	}
 	
 	ArrayList<BitSet> get_influence_domain_v02(int node){
@@ -130,15 +135,23 @@ public class ProximityPrestige {
 	 * @param g
 	 * @return array of page rank value per node. Sum over all page rank value = 1.
 	 */
-	public static double[][] run(Graph g) {
+	public static InfDom[] run(Graph g) {
 		InfDom[] temp = new ProximityPrestige(g).run();
-		double[][] pp_raw = new double[temp.length][3];
+		return temp;
+		/*double[][] pp_raw = new double[temp.length][3];
 		for(int node=0;node<g.num_vertices;node++) {
 			pp_raw[node][0] = temp[node].size_influence_domain;
 			pp_raw[node][1] = temp[node].average_length_of_shortest_path;
 			pp_raw[node][2] = temp[node].proximity_prestige;
 		}
-		return pp_raw;
+		if(Config.materialize_graph) {
+			String path = "./data/inf_dom/"+g.name;
+			System.out.println("Materializing to "+get_graph_name);
+			for(InfDom id : temp) {
+				System.out.println(id.toString());
+			}
+		}
+		return pp_raw;*/
 	}
 	
 	InfDom[] run() {
@@ -153,6 +166,7 @@ public class ProximityPrestige {
 		final int size_influence_domain;
 		final double average_length_of_shortest_path;
 		final double proximity_prestige;
+		//TODO maybe add some int[k]
 		
 		public InfDom(int node, ArrayList<HashSet<Integer>> inf_dom) {
 			this.node = node;
@@ -222,6 +236,10 @@ public class ProximityPrestige {
 				return pp;
 			}//else remain zero
 			return 0.0d;
+		}
+		
+		public String toString() {
+			return node+"\t"+this.size_influence_domain+"\t"+this.average_length_of_shortest_path+"\t"+this.proximity_prestige;
 		}
 	}
 }

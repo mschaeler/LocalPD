@@ -7,6 +7,13 @@ public class TheoreticalAnalysis {
 	static double[] all_epsilon = {1,2,3,4,5,6,7,8,9,10};
 	static final int thousand = 1000;
 	
+	/**
+	 * 
+	 * @param neighbor_count
+	 * @param epsilon
+	 * @param num_vertices
+	 * @return result[mae, deleted_edges, new_fake_edges]
+	 */
 	public static double[] error_rr(double neighbor_count, double epsilon, double num_vertices) {
 		double p = Mechanism.epsilon_to_p(epsilon);
 		double deleted_edges = neighbor_count * p;
@@ -214,6 +221,13 @@ public class TheoreticalAnalysis {
 		double p = M_Part_Partition.get_p(epsilon_q2, partition_size);
 		error += 2.0d*c_s*(1.0d-p);//for every new fake edge, we miss one real edge, i.e., we have to double te error
 		
+		return error;
+	}
+	public static double error_m_sample(double c_s, double epsilon_q1, double epsilon_q2, double num_vertices) {
+		double error = 1.0d / epsilon_q1; // Error from q1
+		double nominator = c_s * (num_vertices-c_s);
+		double denominator = num_vertices+(c_s*Math.pow(Math.E, epsilon_q2-1));
+		error += 2*(nominator / denominator);
 		return error;
 	}
 }
