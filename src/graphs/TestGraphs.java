@@ -36,6 +36,10 @@ public class TestGraphs {
 	public static final int M_PART_NO_SEQ		= 16;
 	public static final int M_SAMPLE_NO_RR		= 17;
 	public static final int M_SAMPLE_WEIGHTED_NO_RR = 18;
+	public static final int M_PART_2_NO_RR		= 19;
+	public static final int M_PART_RAND_SAMPLE  = 20;
+	public static final int M_PART_RAND_SAMPLE_NO_RR  = 21;
+	public static final int M_NOISY_MAX_NO_RR  = 22;
 	
 	static double e_q1 = 1.0;
 	
@@ -70,7 +74,7 @@ public class TestGraphs {
 		}else if(mechanism==M_PART){
 			san_g = Mechanism.m_part(g, epsilon, e_q1);
 		}else if(mechanism==M_PART_2){
-			san_g = Mechanism.m_part_2(g, epsilon, e_q1);
+			san_g = Mechanism.m_part_2(g, epsilon, e_q1, false);
 		}else if(mechanism==M_SAMPLE){
 			boolean no_rr_fall_back = false;
 			san_g = Mechanism.m_sample(g, epsilon, e_q1, no_rr_fall_back);
@@ -87,6 +91,18 @@ public class TestGraphs {
 		}else if(mechanism==M_SAMPLE_WEIGHTED_NO_RR){
 			boolean no_rr_fall_back = true;
 			san_g = Mechanism.m_sample_weighted(g, epsilon, e_q1, no_rr_fall_back);
+		}else if(mechanism==M_PART_2_NO_RR){
+			boolean no_rr_fall_back = true;
+			san_g = Mechanism.m_part_2(g, epsilon, e_q1, no_rr_fall_back);
+		}else if(mechanism==M_PART_RAND_SAMPLE){
+			boolean no_rr_fall_back = false;
+			san_g = Mechanism.m_part_sample(g, epsilon, e_q1, no_rr_fall_back);
+		}else if(mechanism==M_PART_RAND_SAMPLE_NO_RR){
+			boolean no_rr_fall_back = true;
+			san_g = Mechanism.m_part_sample(g, epsilon, e_q1, no_rr_fall_back);
+		}else if(mechanism==M_NOISY_MAX_NO_RR){
+			boolean no_rr_fall_back = true;
+			san_g = Mechanism.m_part_noisy_max(g, epsilon, e_q1, no_rr_fall_back);
 		}else{
 			System.err.println("run() Unknown mechanism "+mechanism);
 			san_g = null;
@@ -95,48 +111,61 @@ public class TestGraphs {
 	}
 	
 	private static String name(final int mechanism) {
+		String name;
 		if(mechanism==RANDOM_RESPONSE) {
-			return "RANDOM_RESPONSE";
+			name= "RANDOM_RESPONSE";
 		}else if(mechanism==K_EDGE_NON_PRIVATE){
-			return "K_EDGE_NON_PRIVATE";
+			name= "K_EDGE_NON_PRIVATE";
 		}else if(mechanism==K_EDGE_SEQ){
-			return "K_EDGE_SEQ";
+			name= "K_EDGE_SEQ";
 		}else if(mechanism==K_EDGE_SEQ_RR){
-			return "K_EDGE_SEQ_RR";
+			name= "K_EDGE_SEQ_RR";
 		}else if(mechanism==K_EDGE_PART){
-			return "K_EDGE_PART";
+			name= "K_EDGE_PART";
 		}else if(mechanism==K_EDGE_PART_RR){
-			return "K_EDGE_PART_RR";
+			name= "K_EDGE_PART_RR";
 		}else if(mechanism==TOP_K){
-			return "TOP_K";
+			name= "TOP_K";
 		}else if(mechanism==GUESS){
-			return "GUESS";
+			name= "GUESS";
 		}else if(mechanism==LDP_GEN){
-			return "LDP_GEN";
+			name= "LDP_GEN";
 		}else if(mechanism==CHUNG_LU){
-			return "CHUNG_LU";
+			name= "CHUNG_LU";
 		}else if(mechanism==TWO_K_SERIES){
-			return "TWO_K_SERIES";
+			name= "TWO_K_SERIES";
 		}else if(mechanism==M_PART){
-			return "M_PART";
+			name= "M_PART";
 		}else if(mechanism==M_PART_2){
-			return "M_PART_2";
+			name= "M_PART_2";
 		}else if(mechanism==M_SAMPLE){
-			return "M_SAMPLE";
+			name= "M_SAMPLE";
 		}else if(mechanism==M_SAMPLE_WEIGHTED){
-			return "M_SAMPLE_WEIGHTED";
+			name= "M_SAMPLE_WEIGHTED";
 		}else if(mechanism==M_NAIVE){
-			return "M_NAIVE";
+			name= "M_NAIVE";
 		}else if(mechanism==M_PART_NO_SEQ){
-			return "M_PART_NO_SEQ";
+			name= "M_PART_NO_SEQ";
 		}else if(mechanism==M_SAMPLE_NO_RR){
-			return "M_SAMPLE_NO_RR";
+			name= "M_SAMPLE_NO_RR";
 		}else if(mechanism==M_SAMPLE_WEIGHTED_NO_RR){
-			return "M_SAMPLE_WEIGHTED_NO_RR";
+			name= "M_SAMPLE_WEIGHTED_NO_RR";
+		}else if(mechanism==M_PART_2_NO_RR){
+			name= "M_PART_2_NO_RR";
+		}else if(mechanism==M_PART_RAND_SAMPLE){
+			name= "M_PART_RAND_SAMPLE";
+		}else if(mechanism==M_PART_RAND_SAMPLE_NO_RR){
+			name= "M_PART_RAND_SAMPLE_NO_RR";
+		}else if(mechanism==M_NOISY_MAX_NO_RR){
+			name= "M_NOISY_MAX_NO_RR";
 		}else{
 			System.err.println("name() Unknown mechanism "+mechanism);
 			return null;
 		}
+		if(Config.none_private_m1) {
+			name+="_np_m1";
+		}
+		return name;
 	}
 	
 	private static void matrialize_private_graphs(int[] graphs, int[] mechanism, int num_repitions, double[] all_eps) {
@@ -283,6 +312,20 @@ public class TestGraphs {
 		experiment_triangle_error(get_mechanism_names(all_mechanism), all_epsilon, all_graphs);
 	}
 
+	public static void experiment_1_local_error_no_rr() {
+		int[] all_mechanism = {M_NAIVE, M_SAMPLE_NO_RR, M_PART_2_NO_RR, M_PART_RAND_SAMPLE_NO_RR};
+		int[] all_graphs 	= Config.graphs;
+		double[] all_epsilon= Config.all_eps;
+		experiment_local_error(all_mechanism, all_epsilon, all_graphs);	
+	}
+	
+	public static void experiment_3_local_error_with_rr() {
+		int[] all_mechanism = {M_SAMPLE, M_PART_2, M_PART_RAND_SAMPLE};
+		int[] all_graphs 	= Config.graphs;
+		double[] all_epsilon= Config.all_eps;
+		experiment_local_error(all_mechanism, all_epsilon, all_graphs);	
+	}
+	
 	public static void experiment_local_error() {
 		int[] all_mechanism = Config.mechanism;
 		int[] all_graphs 	= Config.graphs;
@@ -321,12 +364,16 @@ public class TestGraphs {
 	}
 	
 	public static void main(String[] args) {
-		matrialize_private_graphs();
+		//matrialize_private_graphs();
 		//out_graph_statistics();
-		experiment_local_error();	
+		//experiment_local_error();
+		//experiment_m1_budget();
 		//experiment_degree_distribution();
 		//experiment_triangle_error();
 		//int k= 10; experiment_inf_dom(k);
+		//experiment_1_local_error_no_rr();
+		experiment_2_precision_error_estimation();
+		//experiment_3_local_error_with_rr();
 	}
 
 	public static void experiment_inf_dom(int k) {//TODO k
@@ -460,5 +507,130 @@ public class TestGraphs {
 			}
 			System.out.println();
 		}*/
+	}
+	
+	public static void experiment_m1_budget() {
+		double[] all_e = Config.all_eps;
+		Config.num_repitions = 2;
+		//double[] all_e = {10};
+		double[] all_e1 = {1.0d/2,1.0d/4,1.0d/8,1.0d/16,1.0d/32,1.0d/64};
+		int[] graphs = {DataLoader.ENRON_SINGLE_EDGE};
+		boolean no_rr_fall_back = false;
+		
+		double[][] results = new double[all_e.length][all_e1.length];
+		
+		for(int g_id : graphs) {
+			Graph g = DataLoader.get_graph(g_id);
+			BitSet[] ground_truth = g.get_adjancency_matrix_as_bit_vector();
+				
+			//m_part_2
+			for(int i=0;i<all_e1.length;i++) {
+				double e_1_share = all_e1[i];
+				Mechanism.rand.setSeed(Util.seed);
+				for(int j=0;j<all_e.length;j++) {
+					double epsilon = all_e[j];
+					double epsilon_q1 = epsilon*e_1_share;
+					System.out.println(epsilon);
+					ArrayList<Graph> g_s = new ArrayList<Graph>(Config.num_repitions);
+					for(int run=0;run<Config.num_repitions;run++) {
+						g_s.add(Mechanism.m_part_2(g, epsilon, epsilon_q1, no_rr_fall_back));
+					}
+					 
+					double[] res = Metrics.avg_edge_edit_dist(ground_truth,g.num_vertices, g_s);
+					System.out.println(Arrays.toString(res));
+					//String[] line = {""+epsilon, ""+(res[Metrics.missing_edge]+res[Metrics.new_fake_edge])};
+					results[j][i] = res[Metrics.missing_edge]+res[Metrics.new_fake_edge];
+				}
+			}
+		}
+		//Out results
+		for(double e_1_share : all_e1) {
+			System.out.print("\te_1="+e_1_share);	
+		}
+		System.out.println();
+		//TODO
+		for(double[] arr : results) {
+			System.out.println(Arrays.toString(arr));
+		}
+		
+	}
+	
+	public static void experiment_2_precision_error_estimation() {
+		Config.DEBUG = true;
+		//TODO non-private?
+		Config.none_private_m1 = true;
+		
+		double[] all_e = Config.all_eps;
+		int[] graphs = {DataLoader.ENRON_SINGLE_EDGE};
+		boolean no_rr_fall_back = true;
+		
+		double[][] results = new double[all_e.length][3];
+		
+		for(int g_id : graphs) {
+			Graph g = DataLoader.get_graph(g_id);
+				
+			//m_sample
+			Mechanism.rand.setSeed(Util.seed);
+			for(int j=0;j<all_e.length;j++) {
+				double epsilon = all_e[j];
+				double epsilon_q1 = 1;//TODO d.h. das ist immer plus 1?
+				System.out.println(epsilon);
+				double[] estimation_errors = new double[Config.num_repitions];
+				for(int run=0;run<Config.num_repitions;run++) {
+					Graph san_g = Mechanism.m_sample(g, epsilon, epsilon_q1, no_rr_fall_back);
+					estimation_errors[run]=Mechanism.estimation_error;
+				}
+				 
+				double res = misc.Util.sum(estimation_errors)/(double)estimation_errors.length;
+				System.out.println(res);
+				//String[] line = {""+epsilon, ""+(res[Metrics.missing_edge]+res[Metrics.new_fake_edge])};
+				results[j][0] = res;
+			}
+			
+			//m_part_noisy_max
+			Mechanism.rand.setSeed(Util.seed);
+			for(int j=0;j<all_e.length;j++) {
+				double epsilon = all_e[j];
+				double epsilon_q1 = 1;//TODO d.h. das ist immer plus 1?
+				System.out.println(epsilon);
+				double[] estimation_errors = new double[Config.num_repitions];
+				for(int run=0;run<Config.num_repitions;run++) {
+					Graph san_g = Mechanism.m_part_noisy_max(g, epsilon, epsilon_q1, no_rr_fall_back);
+					estimation_errors[run]=Mechanism.estimation_error;
+				}
+				 
+				double res = misc.Util.sum(estimation_errors)/(double)estimation_errors.length;
+				System.out.println(res);
+				//String[] line = {""+epsilon, ""+(res[Metrics.missing_edge]+res[Metrics.new_fake_edge])};
+				results[j][1] = res;
+			}
+			
+			//m_part_2
+			Mechanism.rand.setSeed(Util.seed);
+			for(int j=0;j<all_e.length;j++) {
+				double epsilon = all_e[j];
+				double epsilon_q1 = 1;//TODO d.h. das ist immer plus 1?
+				System.out.println(epsilon);
+				double[] estimation_errors = new double[Config.num_repitions];
+				for(int run=0;run<Config.num_repitions;run++) {
+					Graph san_g = Mechanism.m_part_2(g, epsilon, epsilon_q1, no_rr_fall_back);
+					estimation_errors[run]=Mechanism.estimation_error;
+				}
+				 
+				double res = misc.Util.sum(estimation_errors)/(double)estimation_errors.length;
+				System.out.println(res);
+				//String[] line = {""+epsilon, ""+(res[Metrics.missing_edge]+res[Metrics.new_fake_edge])};
+				results[j][2] = res;
+			}
+			
+		}
+		System.out.println("\tm_sample\tm_part_sample\tm_part_2");
+		for(int i=0;i<results.length;i++) {
+			double[] arr = results[i];
+			System.out.println("e="+all_e[i]+"\t"+arr[0]+"\t"+arr[1]+"\t"+arr[2]);
+		}
+		
+		Config.DEBUG = false;
+		Config.none_private_m1 = false;
 	}
 }

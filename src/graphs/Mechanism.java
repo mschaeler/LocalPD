@@ -19,6 +19,7 @@ import results.Config;
 import results.TheoreticalAnalysis;
 
 public class Mechanism {
+	public static double estimation_error;
 	public static java.util.Random rand = new java.util.Random(Util.seed);
 	
 	public static boolean use_safe_variant = false;//usually much fast. sufficient for benchmarking, but not suited for productive use
@@ -320,6 +321,222 @@ public class Mechanism {
 		}
 	}
 	
+	
+	public static Graph m_part_sample(Graph g, final double all_epsilon, final double epsilon_q1, boolean no_rr_fall_back) {
+		String name = "m_part_sample() e="+all_epsilon+" e_1="+epsilon_q1+(no_rr_fall_back ? "disable_rr_fall_back" : "");
+		System.out.println(name);
+		double start = System.currentTimeMillis();
+			
+		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
+		
+		//distribute budget
+		final double count_query_epsilon = epsilon_q1;
+		final double epsilon_q2 = all_epsilon-epsilon_q1;
+		final double p = epsilon_to_p(epsilon_q2);
+		{
+			double error_rr = TheoreticalAnalysis.error_rr(1, all_epsilon, g.num_vertices)[0];
+			double my_errror = TheoreticalAnalysis.error_m_part_sample(1, epsilon_q1, epsilon_q2, g.num_vertices);
+		if(!no_rr_fall_back && error_rr < my_errror) {
+			return radomized_response(g, all_epsilon);
+		}
+		}
+		
+		@SuppressWarnings("unchecked")
+		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
+		
+		boolean[] duplicate_check = new boolean[g.num_vertices];
+		
+		if(Config.DEBUG) System.out.println("node\t|N_s|\t|N|\tError rr\terror_m_part\terror_sample\tobserved error\tprob(e)");
+		
+		double rr_fall_backs = 0;
+		double sum_error_observed   = 0;
+		double sum_error_estimated  = 0;
+		estimation_error = 0;
+		
+		for(int node=0;node<g.num_vertices;node++) {
+			Arrays.fill(duplicate_check, false);
+
+			//Execute Q1
+			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
+			if(Config.none_private_m1) {
+				sanitized_number_of_outgoing_egdes = neighbor_list[node].size();
+			}
+			
+			//Decide whether we use k-edge or fall back to randomized response
+			double error_rr = TheoreticalAnalysis.error_rr(sanitized_number_of_outgoing_egdes, epsilon_q2, g.num_vertices)[0];
+			double error_m_part = TheoreticalAnalysis.error_m_part(sanitized_number_of_outgoing_egdes, epsilon_q1, epsilon_q2, g.num_vertices);
+			double error_sample = TheoreticalAnalysis.error_m_part_sample(sanitized_number_of_outgoing_egdes, epsilon_q1, epsilon_q2, g.num_vertices);
+			double prob_existing_edge = ( epsilon_q2)*Sample.SCORE_EXISTING_EDGE/(2.0d*Sample.delta_u());
+			//System.out.println("|N_s|="+sanitized_number_of_outgoing_egdes+"|N|="+neighbor_list[node].size()+" Errors rr="+error_rr+" k_edge="+error_k_edge+" error_m_part="+error_m_part+" error_sample="+error_sample);
+			if(no_rr_fall_back) {
+				error_rr = Double.MAX_VALUE;
+			}
+			
+			ArrayList<Integer> my_sanitized_neighbors;
+			
+			
+			if(sanitized_number_of_outgoing_egdes<=0) {
+				my_sanitized_neighbors = new ArrayList<Integer>();
+			}else if(!no_rr_fall_back && error_rr<error_sample){
+				//rr-fallback
+				rr_fall_backs++;
+				my_sanitized_neighbors = rr_fall_back(node, p, neighbor_list, g, rand);
+			}else{
+				HashSet<Integer> my_neighbors = new HashSet<Integer>(neighbor_list[node].size());
+				for(int true_edge : neighbor_list[node]) {
+					my_neighbors.add(true_edge);
+				}
+				my_sanitized_neighbors = new ArrayList<Integer>();
+				//TODO Every time again?
+				RandomSamplePartition[] my_partitions = new RandomSamplePartition[sanitized_number_of_outgoing_egdes];
+				for(int part=0;part<my_partitions.length;part++) {
+					my_partitions[part] = new RandomSamplePartition(g.num_vertices/(sanitized_number_of_outgoing_egdes));
+				}
+				for(int edge=0;edge<g.num_vertices;edge++) {
+					my_partitions[edge%sanitized_number_of_outgoing_egdes].add_edge(edge);
+				}
+				//Sample
+				for(RandomSamplePartition partition : my_partitions) {
+					int edge = partition.sample(my_neighbors, epsilon_q2, rand);
+					my_sanitized_neighbors.add(edge);
+				}
+			}
+			
+			if(Config.DEBUG) {
+				int[] erorrs = Metrics.edge_edit_dist(neighbor_list[node],my_sanitized_neighbors, g.num_vertices);
+				double observed_error = erorrs[1]+erorrs[2];
+				//System.out.println(node+"\t"+sanitized_number_of_outgoing_egdes+"\t"+neighbor_list[node].size()+"\t"+error_rr+"\t"+error_m_part+"\t"+error_sample+"\t"+observed_error+"\t"+prob_existing_edge);
+				sum_error_estimated += error_sample;
+				sum_error_observed += observed_error;
+			}
+			
+			if(Config.materialize_graph) {
+				Graph.write_edge_list(node, my_sanitized_neighbors);
+			}else {
+				sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			}
+			
+			if(node%1000==0) {
+				System.out.print("node="+node+" ");
+			}
+		}
+		if(Config.DEBUG) {
+			estimation_error = Math.abs(sum_error_estimated-sum_error_observed) / (double) g.num_vertices;
+		}
+		Graph.stop(start, "m_part_sample() rr_fall_backs="+rr_fall_backs);
+		if(Config.materialize_graph)
+			return null;
+		return new Graph(sanitized_neighbor_list, g.name+" "+name);
+	}
+	
+	public static Graph m_part_noisy_max(Graph g, final double all_epsilon, final double epsilon_q1, boolean no_rr_fall_back) {
+		String name = "m_part_noisy_max() e="+all_epsilon+" e_1="+epsilon_q1+(no_rr_fall_back ? "disable_rr_fall_back" : "");
+		System.out.println(name);
+		double start = System.currentTimeMillis();
+			
+		ArrayList<Integer>[] neighbor_list = g.get_neighbors();
+		
+		//distribute budget
+		final double count_query_epsilon = epsilon_q1;
+		final double epsilon_q2 = all_epsilon-epsilon_q1;
+		final double p = epsilon_to_p(epsilon_q2);
+		{
+			double error_rr = TheoreticalAnalysis.error_rr(1, all_epsilon, g.num_vertices)[0];
+			double my_errror = TheoreticalAnalysis.error_m_part_sample(1, epsilon_q1, epsilon_q2, g.num_vertices);
+			if(!no_rr_fall_back && error_rr < my_errror) {
+				return radomized_response(g, all_epsilon);
+			}
+		}
+		
+		@SuppressWarnings("unchecked")
+		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
+		
+		boolean[] duplicate_check = new boolean[g.num_vertices];
+		
+		if(Config.DEBUG) System.out.println("node\t|N_s|\t|N|\tError rr\terror_m_part\terror_sample\tobserved error\tprob(e)");
+		
+		double rr_fall_backs = 0;
+		double sum_error_observed   = 0;
+		double sum_error_estimated  = 0;
+		estimation_error = 0;
+		
+		for(int node=0;node<g.num_vertices;node++) {
+			Arrays.fill(duplicate_check, false);
+
+			//Execute Q1
+			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
+			if(Config.none_private_m1) {
+				sanitized_number_of_outgoing_egdes = neighbor_list[node].size();
+			}
+			
+			//Decide whether we use k-edge or fall back to randomized response
+			double error_rr = TheoreticalAnalysis.error_rr(sanitized_number_of_outgoing_egdes, epsilon_q2, g.num_vertices)[0];
+			double error_m_part = TheoreticalAnalysis.error_m_part(sanitized_number_of_outgoing_egdes, epsilon_q1, epsilon_q2, g.num_vertices);
+			double error_sample = TheoreticalAnalysis.error_noisy_max_algorithm(sanitized_number_of_outgoing_egdes);
+			double prob_existing_edge = ( epsilon_q2)*Sample.SCORE_EXISTING_EDGE/(2.0d*Sample.delta_u());
+			//System.out.println("|N_s|="+sanitized_number_of_outgoing_egdes+"|N|="+neighbor_list[node].size()+" Errors rr="+error_rr+" k_edge="+error_k_edge+" error_m_part="+error_m_part+" error_sample="+error_sample);
+			if(no_rr_fall_back) {
+				error_rr = Double.MAX_VALUE;
+			}
+			
+			ArrayList<Integer> my_sanitized_neighbors;
+			
+			
+			if(sanitized_number_of_outgoing_egdes<=0) {
+				my_sanitized_neighbors = new ArrayList<Integer>();
+			}else if(!no_rr_fall_back && error_rr<error_sample){
+				//rr-fallback
+				rr_fall_backs++;
+				my_sanitized_neighbors = rr_fall_back(node, p, neighbor_list, g, rand);
+			}else{
+				HashSet<Integer> my_neighbors = new HashSet<Integer>(neighbor_list[node].size());
+				for(int true_edge : neighbor_list[node]) {
+					my_neighbors.add(true_edge);
+				}
+				my_sanitized_neighbors = new ArrayList<Integer>();
+				//TODO Every time again?
+				RandomSamplePartition[] my_partitions = new RandomSamplePartition[sanitized_number_of_outgoing_egdes];
+				for(int part=0;part<my_partitions.length;part++) {
+					my_partitions[part] = new RandomSamplePartition(g.num_vertices/(sanitized_number_of_outgoing_egdes));
+				}
+				for(int edge=0;edge<g.num_vertices;edge++) {
+					my_partitions[edge%sanitized_number_of_outgoing_egdes].add_edge(edge);
+				}
+				//Noisy max
+				for(RandomSamplePartition partition : my_partitions) {
+					int edge = partition.noisy_max(my_neighbors, epsilon_q2, rand);
+					my_sanitized_neighbors.add(edge);
+				}
+			}
+			
+			if(Config.DEBUG) {
+				int[] erorrs = Metrics.edge_edit_dist(neighbor_list[node],my_sanitized_neighbors, g.num_vertices);
+				double observed_error = erorrs[1]+erorrs[2];
+				//System.out.println(node+"\t"+sanitized_number_of_outgoing_egdes+"\t"+neighbor_list[node].size()+"\t"+error_rr+"\t"+error_m_part+"\t"+error_sample+"\t"+observed_error+"\t"+prob_existing_edge);
+				sum_error_estimated += error_sample;
+				sum_error_observed += observed_error;
+				//System.out.println(sum_error_estimated+"\t"+sum_error_observed);
+			}
+			
+			if(Config.materialize_graph) {
+				Graph.write_edge_list(node, my_sanitized_neighbors);
+			}else {
+				sanitized_neighbor_list[node] = my_sanitized_neighbors;
+			}
+			
+			if(node%1000==0) {
+				System.out.print("node="+node+" ");
+			}
+		}
+		if(Config.DEBUG) {
+			estimation_error = Math.abs(sum_error_estimated-sum_error_observed) / (double) g.num_vertices;
+		}
+		Graph.stop(start, "m_part_noisy_max() rr_fall_backs="+rr_fall_backs);
+		if(Config.materialize_graph)
+			return null;
+		return new Graph(sanitized_neighbor_list, g.name+" "+name);
+	}
+	
 	public static Graph m_sample(Graph g, final double all_epsilon, final double epsilon_q1, boolean no_rr_fall_back) {
 		String name = "m_sample() e="+all_epsilon+" e_1="+epsilon_q1+(no_rr_fall_back ? "disable_rr_fall_back" : "");
 		System.out.println(name);
@@ -332,7 +549,7 @@ public class Mechanism {
 		final double epsilon_q2 = all_epsilon-epsilon_q1;
 		final double p = epsilon_to_p(epsilon_q2);
 		
-		if(TheoreticalAnalysis.error_rr(1, all_epsilon, g.num_vertices)[0]< TheoreticalAnalysis.error_m_part(1, epsilon_q1, epsilon_q2, g.num_vertices)) {
+		if(!no_rr_fall_back && TheoreticalAnalysis.error_rr(1, all_epsilon, g.num_vertices)[0]< TheoreticalAnalysis.error_m_sample(1, epsilon_q1, epsilon_q2, g.num_vertices)) {
 			return radomized_response(g, all_epsilon);
 		}
 		
@@ -341,31 +558,41 @@ public class Mechanism {
 		
 		boolean[] duplicate_check = new boolean[g.num_vertices];
 		
-		System.out.println("node\t|N_s|\t|N|\tError rr\terror_m_part\terror_sample\tobserved error");
+		if(Config.DEBUG) System.out.println("node\t|N_s|\t|N|\tError rr\terror_m_part\terror_sample\tobserved error\tprob(e)");
+		
+		double rr_fall_backs = 0;
+		
+		double sum_error_observed   = 0;
+		double sum_error_estimated  = 0;
+		estimation_error = 0;
 		
 		for(int node=0;node<g.num_vertices;node++) {
 			Arrays.fill(duplicate_check, false);
 
 			//Execute Q1
 			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, count_query_epsilon);
-			sanitized_number_of_outgoing_egdes = neighbor_list[node].size();
+			if(Config.none_private_m1) {
+				sanitized_number_of_outgoing_egdes = neighbor_list[node].size();
+			}
 			
 			//Decide whether we use k-edge or fall back to randomized response
 			double error_rr = TheoreticalAnalysis.error_rr(sanitized_number_of_outgoing_egdes, epsilon_q2, g.num_vertices)[0];
 			double error_m_part = TheoreticalAnalysis.error_m_part(sanitized_number_of_outgoing_egdes, epsilon_q1, epsilon_q2, g.num_vertices);
 			double error_sample = TheoreticalAnalysis.error_m_sample(sanitized_number_of_outgoing_egdes, epsilon_q1, epsilon_q2, g.num_vertices);
+			double prob_existing_edge = ( epsilon_q2/(double)sanitized_number_of_outgoing_egdes)*Sample.SCORE_EXISTING_EDGE/(2.0d*Sample.delta_u());
 			//System.out.println("|N_s|="+sanitized_number_of_outgoing_egdes+"|N|="+neighbor_list[node].size()+" Errors rr="+error_rr+" k_edge="+error_k_edge+" error_m_part="+error_m_part+" error_sample="+error_sample);
-			
 			if(no_rr_fall_back) {
-				error_sample = 0;
+				error_rr = Double.MAX_VALUE;
 			}
+			
 			ArrayList<Integer> my_sanitized_neighbors;
 			
 			
 			if(sanitized_number_of_outgoing_egdes<=0) {
 				my_sanitized_neighbors = new ArrayList<Integer>();
-			}else if(error_rr<error_sample){
+			}else if(!no_rr_fall_back && error_rr<error_sample){
 				//rr-fallback
+				rr_fall_backs++;
 				my_sanitized_neighbors = rr_fall_back(node, p, neighbor_list, g, rand);
 			}else{
 				ArrayList<Integer> my_neighbors = neighbor_list[node];
@@ -374,8 +601,10 @@ public class Mechanism {
 				for(int edge : my_neighbors) {
 					my_scores[edge] = Sample.SCORE_EXISTING_EDGE;//for all other edges it remains zero
 				}
+				double e_k = epsilon_q2/(double)sanitized_number_of_outgoing_egdes;
 				for(int edge=0;edge<my_scores.length;edge++) {
-					my_scores[edge] = Math.pow(Math.E,epsilon_q2/(double)sanitized_number_of_outgoing_egdes*my_scores[edge]/(2.0d*Sample.delta_u()));
+					double temp = e_k*my_scores[edge]/(2.0d*Sample.delta_u());
+					my_scores[edge] = Math.pow(Math.E,temp);
 				}
 				HashSet<Integer> edges = new HashSet<Integer>();//We do not want duplicates
 				while(edges.size()<sanitized_number_of_outgoing_egdes) {
@@ -388,7 +617,11 @@ public class Mechanism {
 			
 			int[] erorrs = Metrics.edge_edit_dist(neighbor_list[node],my_sanitized_neighbors, g.num_vertices);
 			double observed_error = erorrs[1]+erorrs[2];
-			System.out.println(node+"\t"+sanitized_number_of_outgoing_egdes+"\t"+neighbor_list[node].size()+"\t"+error_rr+"\t"+error_m_part+"\t"+error_sample+"\t"+observed_error);
+			if(Config.DEBUG) {
+				//System.out.println(node+"\t"+sanitized_number_of_outgoing_egdes+"\t"+neighbor_list[node].size()+"\t"+error_rr+"\t"+error_m_part+"\t"+error_sample+"\t"+observed_error+"\t"+prob_existing_edge);
+				sum_error_estimated += error_sample;
+				sum_error_observed += observed_error;
+			}
 			
 			if(Config.materialize_graph) {
 				Graph.write_edge_list(node, my_sanitized_neighbors);
@@ -399,18 +632,20 @@ public class Mechanism {
 			if(node%1000==0) {
 				System.out.print("node="+node+" ");
 			}
-			
-			if(node%10000==0) {
-				System.out.println("node="+node);
-			}
 		}
-		Graph.stop(start, "m_sample()");
+
+		if(Config.DEBUG) {
+			estimation_error = Math.abs(sum_error_estimated-sum_error_observed) / (double) g.num_vertices;
+		}
+		Graph.stop(start, "m_sample() rr_fall_backs="+rr_fall_backs+(Config.DEBUG ? "estimation_error="+estimation_error : ""));
+		
 		if(Config.materialize_graph)
 			return null;
 		return new Graph(sanitized_neighbor_list, g.name+" "+name);
 	}
 	
 	static int counter = 0;
+
 	public static Graph m_sample_weighted(Graph g, final double all_epsilon, final double epsilon_q1, boolean no_rr_fall_back) {
 		String name = "m_sample_weighted() e="+all_epsilon+" e_1="+epsilon_q1+(no_rr_fall_back ? " disable_rr_fall_back" : "");
 		System.out.println(name);
@@ -526,7 +761,7 @@ public class Mechanism {
 		return -1;
 	}
 	
-	public static Graph m_part_2(Graph g, final double all_epsilon, final double epsilon_q1) {
+	public static Graph m_part_2(Graph g, final double all_epsilon, final double epsilon_q1, boolean no_rr_fall_back) {
 		String name = "m_part_2() e="+all_epsilon+" e_1="+epsilon_q1;
 		System.out.println(name);
 		double start = System.currentTimeMillis();
@@ -535,23 +770,50 @@ public class Mechanism {
 		//distribute budget
 		final double epsilon_q2 = all_epsilon-epsilon_q1;
 		
+		if(!no_rr_fall_back && TheoreticalAnalysis.error_rr(1, all_epsilon, g.num_vertices)[0]< TheoreticalAnalysis.error_m_sample(1, epsilon_q1, epsilon_q2, g.num_vertices)) {
+			return radomized_response(g, all_epsilon);
+		}
+		
+		if(Config.DEBUG) System.out.println("node\t|N_s|\t|N|\tError rr\terror_m_part\terror_sample\tobserved error\tprob(e)");
+		double rr_fall_backs = 0;
+		
 		@SuppressWarnings("unchecked")
 		ArrayList<Integer>[] sanitized_neighbor_list = new ArrayList[neighbor_list.length]; 
+		
+		double sum_error_observed   = 0;
+		double sum_error_estimated  = 0;
+		estimation_error = 0;
 		
 		for(int node=0;node<g.num_vertices;node++) {
 			//Execute Q1
 			int sanitized_number_of_outgoing_egdes = q_1(neighbor_list[node], count_query_senstivity, epsilon_q1);
+			if(Config.none_private_m1) {
+				sanitized_number_of_outgoing_egdes = neighbor_list[node].size();
+			}
+			double fake_edges_of_neighbor = g.num_vertices - Math.min(sanitized_number_of_outgoing_egdes, neighbor_list[node].size()-1);
+			double s_prime = fake_edges_of_neighbor;
+			s_prime /= (double)sanitized_number_of_outgoing_egdes;
+			s_prime = Math.ceil(s_prime);
+			
+			//final double a = 1.0d-TheoreticalAnalysis.get_probability_of_selecting_a_fake_node_m_part(g.num_vertices, my_neighbors.size()-1, sanitized_number_of_outgoing_egdes);
+			final double probability = (Math.pow(Math.E, epsilon_q2))/(Math.pow(Math.E, epsilon_q2)+s_prime);
 			
 			//Decide whether we use k-edge or fall back to randomized response
 			double error_rr = TheoreticalAnalysis.error_rr(sanitized_number_of_outgoing_egdes, epsilon_q2, g.num_vertices)[0];
-			double error_m_part_2 =-1; //TODO
-
+			double error_m_part = TheoreticalAnalysis.error_m_part_2(sanitized_number_of_outgoing_egdes, probability, epsilon_q1);
+			double error_sample = TheoreticalAnalysis.error_m_sample(sanitized_number_of_outgoing_egdes, epsilon_q1, epsilon_q2, g.num_vertices);
+			
+			if(no_rr_fall_back) {
+				error_rr = Double.MAX_VALUE;
+			}
+			
 			ArrayList<Integer> my_sanitized_neighbors;
 					
 			if(sanitized_number_of_outgoing_egdes<=0) {
 				my_sanitized_neighbors = new ArrayList<Integer>();
-			}else if(error_rr<error_m_part_2){
+			}else if(error_rr<error_m_part){
 				//rr-fallback
+				rr_fall_backs++;
 				my_sanitized_neighbors = rr_fall_back(node, epsilon_to_p(epsilon_q2), neighbor_list, g, rand);
 			}else{				
 				my_sanitized_neighbors = new ArrayList<Integer>();
@@ -582,8 +844,6 @@ public class Mechanism {
 				}
 				Collections.shuffle(fake_edges);//also ensure uniform picks of fake edges
 				
-				final double a = 1.0d-TheoreticalAnalysis.get_probability_of_selecting_a_fake_node_m_part(g.num_vertices, my_neighbors.size()-1, sanitized_number_of_outgoing_egdes);
-				final double probability = (Math.pow(Math.E, epsilon_q2)*a)/(Math.pow(Math.E, epsilon_q2)*a+1);
 				if(probability>1) {
 					System.err.println("probability>1");
 				}
@@ -602,11 +862,19 @@ public class Mechanism {
 					}
 				}
 				
-				while(my_sanitized_neighbors.size()<sanitized_number_of_outgoing_egdes) {
+				while(my_sanitized_neighbors.size()<sanitized_number_of_outgoing_egdes && i<fake_edges.size()) {
 					my_sanitized_neighbors.add(fake_edges.get(i++));
 				}
+				
+				if(Config.DEBUG) { 
+					int[] erorrs = Metrics.edge_edit_dist(neighbor_list[node],my_sanitized_neighbors, g.num_vertices);
+					double observed_error = erorrs[1]+erorrs[2];
+					//System.out.println(node+"\t"+sanitized_number_of_outgoing_egdes+"\t"+neighbor_list[node].size()+"\t"+error_rr+"\t"+error_m_part+"\t"+error_sample+"\t"+observed_error+"\t"+probability);
+					sum_error_estimated += error_m_part;
+					sum_error_observed += observed_error;
+				}
 			}
-			
+
 			if(Config.materialize_graph) {
 				Graph.write_edge_list(node, my_sanitized_neighbors);
 			}else {
@@ -618,7 +886,10 @@ public class Mechanism {
 			}
 		}
 		System.out.println();
-		Graph.stop(start, "m_part_2()");
+		if(Config.DEBUG) {
+			estimation_error = Math.abs(sum_error_estimated-sum_error_observed) / (double) g.num_vertices;
+		}
+		Graph.stop(start, "m_part_2() rr_fall_backs="+rr_fall_backs);
 		if(Config.materialize_graph) {
 			return null;
 		}else{

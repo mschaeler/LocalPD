@@ -56,6 +56,7 @@ public class Metrics {
 				error[correct_none_edge]++;
 			}
 		}
+
 		return error;
 	}
 	

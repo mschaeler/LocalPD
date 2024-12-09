@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import results.Config;
+
 public class MaterializedGraphs implements Comparable<MaterializedGraphs>{
 	public final String path;
 	public final String graph_name;
@@ -67,6 +69,9 @@ public class MaterializedGraphs implements Comparable<MaterializedGraphs>{
 		for(MaterializedGraphs mg : mg_s) {
 			if(mg.epsilon==epsilon) {
 				filtered.add(mg);
+			}
+			if(filtered.size()>=Config.num_repitions) {
+				return filtered;		
 			}
 		}
 		return filtered;

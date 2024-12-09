@@ -1,7 +1,11 @@
 package results;
 
+import java.math.BigInteger;
+import java.util.Arrays;
+
 import graphs.M_Part_Partition;
 import graphs.Mechanism;
+import misc.Util;
 
 public class TheoreticalAnalysis {
 	static double[] all_epsilon = {1,2,3,4,5,6,7,8,9,10};
@@ -213,8 +217,24 @@ public class TheoreticalAnalysis {
 		//to_delta_pr(1, 1, 1);
 		//to_delta_pr(1, 2, 1);
 		//to_delta_pr(1, 2, 2);
-		probability_of_selecting_a_fake_node_m_part();
+		//probability_of_selecting_a_fake_node_m_part();
+		for(int i=2;i<40;i++) error_noisy_max_algorithm(i);
 	}
+	/**
+	 * 
+	 * @param c_s
+	 * @param p
+	 * @param epsilon_q1
+	 * @return
+	 */
+	public static double error_m_part_2(double c_s, double p, double epsilon_q1) {
+		if(Config.none_private_m1) {
+			return 2*c_s*(1.0d-p);//times two because we select a fake edge instead of true edge, i.e., edit distance is 2
+		}else{
+			return (1.0d / epsilon_q1) + 2*c_s*(1.0d-p);
+		}
+	}
+	
 	public static double error_m_part(double c_s, double epsilon_q1, double epsilon_q2, double num_vertices) {
 		double error = 1.0d / epsilon_q1; // Error from q1
 		double partition_size = num_vertices / c_s;
@@ -223,12 +243,122 @@ public class TheoreticalAnalysis {
 		
 		return error;
 	}
+	/**
+	 * 
+	 * @param c_s
+	 * @param epsilon_q1
+	 * @param epsilon_q2
+	 * @param num_vertices
+	 * @return
+	 */
 	public static double error_m_sample(double c_s, double epsilon_q1, double epsilon_q2, double num_vertices) {
 		double error = 1.0d / epsilon_q1; // Error from q1
+		if(Config.none_private_m1) {
+			error = 0;
+		}
+		if(c_s==0) {
+			return error; 
+		}
 		double nominator = c_s * (num_vertices-c_s);
-		double denominator = num_vertices+(c_s*Math.pow(Math.E, epsilon_q2-1));
+		double denominator = num_vertices+(c_s*Math.pow(Math.E, (epsilon_q2/c_s)-1));
 		error += 2*(nominator / denominator);
 		return error;
 	}
+	public static double error_m_part_sample(double c_s, double epsilon_q1, double epsilon_q2, double num_vertices) {
+		double error = 1.0d / epsilon_q1; // Error from q1
+		if(Config.none_private_m1) {
+			error = 0;
+		}
+		if(c_s==0) {
+			return error; 
+		}
+		double nominator = c_s * (num_vertices-c_s);
+		double denominator = num_vertices+(c_s*Math.pow(Math.E, (epsilon_q2)-1));
+		error += 2*(nominator / denominator);
+		return error;
+	}
+	
+	public static double error_noisy_max_algorithm(final int c_s) {
+		double[] p_s = new double[c_s];
+		double error = 0.0d;
+		for(int num_empty_urns=0;num_empty_urns<c_s;num_empty_urns++) {
+			int n = c_s;
+			int k = num_empty_urns;
+			//long temp = org.apache.commons.math3.util.CombinatoricsUtils.binomialCoefficient(n, n-k);
+			BigInteger nominator = n_choose_k(n, k);
+			nominator = nominator.multiply(sterling2(n, n-k));
+			nominator = nominator.multiply(factorial(n-k));
+			double denom = Math.pow(n, n);
+			if(nominator.doubleValue()<0) {
+				System.err.println(nominator);
+			}
+			if(denom<0) {
+				System.err.println(denom);
+			}
+			double prob_k_urns_empty = nominator.doubleValue() / denom;
+			p_s[k] = prob_k_urns_empty;
+			error += ((double)k)*2.0d*prob_k_urns_empty;//We do not select a true edge, but also report a false one
+		}
+		//System.out.println(error+"\t"+Util.sum(p_s)+"\t"+Arrays.toString(p_s));
+		if(Double.isNaN(error)) {//We have issues with double precision
+			//System.err.println("NaN");
+			return error_noisy_max_algorithm(c_s-1);
+		}
+		return error;
+	}
+	
+	static BigInteger buffer[][] = new BigInteger[1000][1000];
+	/**
+	 * Computes sterling number of second kind
+	 * @param n
+	 * @param k
+	 * @return
+	 */
+    private static final BigInteger sterling2(int n, int k) {
+        if ( n == 0 && k == 0 ) {
+            return BigInteger.valueOf(1);
+        }
+        if ( (n > 0 && k == 0) || (n == 0 && k > 0) ) {
+            return BigInteger.ZERO; 
+        }
+        if ( n == k ) {
+            return BigInteger.valueOf(1);
+        }
+        if ( k > n ) {
+            return BigInteger.ZERO;
+        }
+        BigInteger result;
+        if(buffer[n][k]!=null) {
+        	result = buffer[n][k];	
+        }else{
+        	result = BigInteger.valueOf(k).multiply(sterling2(n-1, k)).add(sterling2(n-1, k-1));
+        	buffer[n][k] = result;
+        }
+ 
+        return result;
+    }
+    
+    /*
+     * Java method to calculate factorial of a large number
+     * @return BigInteger factorial of given number
+     */
+    public static BigInteger factorial(int number) {
+        BigInteger factorial = BigInteger.ONE;
+
+        for (int i = number; i > 0; i--) {
+            factorial = factorial.multiply(BigInteger.valueOf(i));
+        }
+
+        return factorial;
+    }
+    
+    public static BigInteger n_choose_k(int n, int k) {
+        BigInteger result = BigInteger.ONE;
+        result = result.multiply(factorial(n));
+        result = result.divide(factorial(n-k));
+        result = result.divide(factorial(k));
+        
+        return result;
+    }
 }
 
